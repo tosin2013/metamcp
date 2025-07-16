@@ -40,13 +40,22 @@
   - [🐳 使用 Docker Compose 运行（推荐）](#-使用-docker-compose-运行推荐)
   - [💻 本地开发](#-本地开发)
 - [🔌 MCP 协议兼容性](#-mcp-协议兼容性)
-- [连接到 MetaMCP](#连接到-metamcp)
+- [🔗 连接到 MetaMCP](#-连接到-metamcp)
+  - [📝 例如，通过 mcp.json 连接 Cursor](#-例如通过-mcpjson-连接-cursor)
+  - [🖥️ 连接 Claude Desktop 和其他仅支持 STDIO 的客户端](#️-连接-claude-desktop-和其他仅支持-stdio-的客户端)
+  - [🔧 API Key 认证故障排除](#-api-key-认证故障排除)
 - [❄️ 冷启动问题与自定义 Dockerfile](#️-冷启动问题与自定义-dockerfile)
 - [🔐 认证](#-认证)
 - [🔗 OpenID Connect (OIDC) 提供商支持](#-openid-connect-oidc-提供商支持)
+  - [🛠️ 配置](#️-配置)
+  - [🏢 支持的提供商](#-支持的提供商)
+  - [🔒 安全特性](#-安全特性)
+  - [📱 使用方法](#-使用方法)
+- [🌐 自定义部署和 Nginx 的 SSE 配置](#-自定义部署和-nginx-的-sse-配置)
 - [🏗️ 架构](#️-架构)
   - [📊 时序图](#-时序图)
 - [🗺️ 路线图](#️-路线图)
+- [🌐 i18n](#-i18n)
 - [🤝 贡献指南](#-贡献指南)
 - [📄 许可证](#-许可证)
 - [🙏 鸣谢](#-鸣谢)
@@ -135,9 +144,9 @@ pnpm dev
 
 如有疑问，欢迎提交 **GitHub issues** 或 **PR**。
 
-## 连接到 MetaMCP
+## 🔗 连接到 MetaMCP
 
-### 例如，通过 mcp.json 连接 Cursor
+### 📝 例如，通过 mcp.json 连接 Cursor
 
 示例 `mcp.json`
 
@@ -151,7 +160,7 @@ pnpm dev
 }
 ```
 
-### 连接 Claude Desktop 和其他仅支持 STDIO 的客户端
+### 🖥️ 连接 Claude Desktop 和其他仅支持 STDIO 的客户端
 
 由于 MetaMCP 端点仅支持远程连接（SSE、Streamable HTTP、OpenAPI），仅支持 stdio 服务器的客户端（如 Claude Desktop）需要本地代理来连接。
 
@@ -205,7 +214,7 @@ pnpm dev
 
 更多详细信息和替代方法，请参见 [issue #76](https://github.com/metatool-ai/metamcp/issues/76#issuecomment-3046707532)。
 
-### API Key 认证故障排除
+### 🔧 API Key 认证故障排除
 
 - `?api_key=` 参数 API key 认证不适用于 SSE。仅适用于 Streamable HTTP 和 OpenAPI。
 - 最佳实践是在 `Authorization: Bearer <API_KEY>` 头部中使用 API key。
@@ -269,9 +278,11 @@ MetaMCP 已通过主流 OIDC 提供商测试：
 
 更详细的配置示例和故障排除，请参见 **[CONTRIBUTING.md](CONTRIBUTING.md#openid-connect-oidc-provider-setup)**。
 
-## SSE 的 Nginx 配置
+## 🌐 自定义部署和 Nginx 的 SSE 配置
 
-由于 MCP 使用 SSE 长连接，若你使用 nginx 反向代理，请参考 [nginx.conf.example](nginx.conf.example) 示例配置。
+如果你想将其部署到在线服务或 VPS，需要至少 2GB-4GB 内存的实例。内存越大，性能越好。
+
+由于 MCP 使用 SSE 长连接，若你使用 nginx 等反向代理，请参考 [nginx.conf.example](nginx.conf.example) 示例配置。
 
 ## 🏗️ 架构
 
@@ -316,6 +327,12 @@ sequenceDiagram
 - [ ] 💬 聊天/智能体 Playground
 - [ ] 🧪 MCP 工具选择优化的测试与评估
 - [ ] ⚡ 动态生成 MCP 服务器
+
+## 🌐 i18n
+
+参见 [README-i18n.md](README-i18n.md)
+
+目前支持 en 和 zh 语言环境，欢迎贡献更多语言。
 
 ## 🤝 贡献指南
 
