@@ -60,7 +60,6 @@ export default function EndpointsPage() {
     onSuccess: (data) => {
       // Check if the operation was actually successful
       if (data.success) {
-        console.log("Endpoint created successfully:", data);
         toast.success(t("endpoints:endpointCreated"), {
           description: t("endpoints:endpointCreatedDescription", {
             name: form.getValues().name,

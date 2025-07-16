@@ -242,6 +242,11 @@ serverRouter.post("/mcp", async (req, res) => {
         mcpProxy({
           transportToClient: webAppTransport,
           transportToServer: serverTransport,
+          onCleanup: async () => {
+            const mcpServerName =
+              (req.query.mcpServerName as string) || "Unknown Server";
+            await cleanupSession(newSessionId, mcpServerName);
+          },
         });
       } catch (error) {
         console.error(
@@ -376,24 +381,38 @@ serverRouter.get("/stdio", async (req, res) => {
     if (stdinTransport.stderr) {
       stdinTransport.stderr.on("data", (chunk) => {
         if (chunk.toString().includes("MODULE_NOT_FOUND")) {
-          webAppTransport.send({
-            jsonrpc: "2.0",
-            method: "notifications/stderr",
-            params: {
-              content: "Command not found, transports removed",
-            },
-          });
+          webAppTransport
+            .send({
+              jsonrpc: "2.0",
+              method: "notifications/stderr",
+              params: {
+                content: "Command not found, transports removed",
+              },
+            })
+            .catch((error) => {
+              // Ignore "Not connected" errors during cleanup
+              if (error?.message && !error.message.includes("Not connected")) {
+                console.error("Error sending stderr notification:", error);
+              }
+            });
           webAppTransport.close();
           cleanupSession(webAppTransport.sessionId);
           console.error("Command not found, transports removed");
         } else {
-          webAppTransport.send({
-            jsonrpc: "2.0",
-            method: "notifications/stderr",
-            params: {
-              content: chunk.toString(),
-            },
-          });
+          webAppTransport
+            .send({
+              jsonrpc: "2.0",
+              method: "notifications/stderr",
+              params: {
+                content: chunk.toString(),
+              },
+            })
+            .catch((error) => {
+              // Ignore "Not connected" errors as they're expected when connections close
+              if (error?.message && !error.message.includes("Not connected")) {
+                console.error("Error sending stderr notification:", error);
+              }
+            });
         }
       });
     }
@@ -401,6 +420,11 @@ serverRouter.get("/stdio", async (req, res) => {
     mcpProxy({
       transportToClient: webAppTransport,
       transportToServer: serverTransport,
+      onCleanup: async () => {
+        const mcpServerName =
+          (req.query.mcpServerName as string) || "Unknown Server";
+        await cleanupSession(webAppTransport.sessionId, mcpServerName);
+      },
     });
   } catch (error) {
     console.error("Error in /stdio route:", error);
@@ -475,6 +499,11 @@ serverRouter.get("/sse", async (req, res) => {
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: serverTransport,
+        onCleanup: async () => {
+          const mcpServerName =
+            (req.query.mcpServerName as string) || "Unknown Server";
+          await cleanupSession(webAppTransport.sessionId, mcpServerName);
+        },
       });
     }
   } catch (error) {
