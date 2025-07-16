@@ -268,7 +268,9 @@ Once configured, users will see a **"Sign in with OIDC"** button on the login pa
 
 For more detailed configuration examples and troubleshooting, see **[CONTRIBUTING.md](CONTRIBUTING.md#openid-connect-oidc-provider-setup)**.
 
-## SSE conf for Nginx
+## Custom Deployment and SSE conf for Nginx
+
+If you want to deploy it to a online service or a VPS, a instance of at least 2GB-4GB of memory is required. And the larger size, the better performance.
 
 Since MCP leverages SSE for long connection, if you are using reverse proxy like nginx, please refer to an example setup [nginx.conf.example](nginx.conf.example)
 
