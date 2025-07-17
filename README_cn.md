@@ -94,7 +94,7 @@ MCP 服务器配置，告诉 MetaMCP 如何启动 MCP 服务器。
 ### 🌐 **MetaMCP 端点**
 - 创建端点并为其分配命名空间
 - 命名空间内的多个 MCP 服务器将被聚合并作为 MetaMCP 端点输出
-- 可选择认证级别和策略
+- 可选择 API Key 认证（头部或查询参数）或 MCP Spec 2025-06-18 标准 OAuth
 - 通过 **SSE** 或 **Streamable HTTP** 传输协议以及 **OpenAPI** 端点对外提供服务，支持 [Open WebUI](https://github.com/open-webui/open-webui) 等客户端
 
 ### ⚙️ **中间件**
@@ -233,6 +233,7 @@ pnpm dev
 - 🛡️ **Better Auth** 用于前后端（TRPC 方法）
 - 🍪 **会话 Cookie** 强制内部 MCP 代理连接安全
 - 🔑 **API key 认证**，外部访问时通过 `Authorization: Bearer <api-key>` 头部
+- 🪪 **MCP OAuth**：暴露的端点可选择使用 MCP Spec 2025-06-18 标准 OAuth，便于连接。
 - 🏢 **多租户**：为组织部署在自己的机器上而设计。支持私有和公共访问范围。用户可以为自己或为所有人创建 MCP、命名空间、端点和 API key。公共 API key 无法访问私有 MetaMCP。
 
 ## 🔗 OpenID Connect (OIDC) 提供商支持

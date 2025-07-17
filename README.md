@@ -94,7 +94,7 @@ A MCP server configuration that tells MetaMCP how to start a MCP server.
 ### 🌐 **MetaMCP Endpoint**
 - Create endpoints and assign namespace to endpoints
 - Multiple MCP servers in the namespace will be aggregated and emitted as a MetaMCP endpoint
-- Choose auth level and strategy
+- Choose between API-Key Auth (in header or query param) or standard OAuth in MCP Spec 2025-06-18
 - Host through **SSE** or **Streamable HTTP** transports in MCP and **OpenAPI** endpoints for clients like [Open WebUI](https://github.com/open-webui/open-webui)
 
 ### ⚙️ **Middleware**
@@ -233,6 +233,7 @@ For more details and alternative approaches, see [issue #76](https://github.com/
 - 🛡️ **Better Auth** for frontend & backend (TRPC procedures)
 - 🍪 **Session cookies** enforce secure internal MCP proxy connections
 - 🔑 **API key authentication** for external access via `Authorization: Bearer <api-key>` header
+- 🪪 **MCP OAuth**: Exposed endpoints have options to use standard OAuth in MCP Spec 2025-06-18, easy to connect.
 - 🏢 **Multi-tenancy**: Designed for organizations to deploy on their own machines. Supports both private and public access scopes. Users can create MCPs, namespaces, endpoints, and API keys for themselves or for everyone. Public API keys cannot access private MetaMCPs.
 
 ## 🔗 OpenID Connect (OIDC) Provider Support
