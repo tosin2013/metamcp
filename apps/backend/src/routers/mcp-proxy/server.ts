@@ -79,10 +79,8 @@ const webAppTransports: Map<string, Transport> = new Map<string, Transport>(); /
 const serverTransports: Map<string, Transport> = new Map<string, Transport>(); // Server Transports by web app sessionId
 
 // Session cleanup function
-const cleanupSession = async (sessionId: string, mcpServerName?: string) => {
-  console.log(
-    `Cleaning up proxy session ${sessionId} for MCP server: ${mcpServerName || "Unknown"}`,
-  );
+const cleanupSession = async (sessionId: string) => {
+  console.log(`Cleaning up proxy session ${sessionId}`);
 
   // Clean up web app transport
   const webAppTransport = webAppTransports.get(sessionId);
@@ -243,9 +241,7 @@ serverRouter.post("/mcp", async (req, res) => {
           transportToClient: webAppTransport,
           transportToServer: serverTransport,
           onCleanup: async () => {
-            const mcpServerName =
-              (req.query.mcpServerName as string) || "Unknown Server";
-            await cleanupSession(newSessionId, mcpServerName);
+            await cleanupSession(newSessionId);
           },
         });
       } catch (error) {
@@ -253,7 +249,7 @@ serverRouter.post("/mcp", async (req, res) => {
           `Error setting up proxy for session ${newSessionId}:`,
           error,
         );
-        await cleanupSession(newSessionId, req.query.mcpServerName as string);
+        await cleanupSession(newSessionId);
         throw error;
       }
 
@@ -312,7 +308,7 @@ serverRouter.delete("/mcp", async (req, res) => {
         // Continue with cleanup even if termination fails
       }
 
-      await cleanupSession(sessionId, mcpServerName);
+      await cleanupSession(sessionId);
       console.log(
         `Session ${sessionId} terminated and cleaned up successfully`,
       );
@@ -356,12 +352,8 @@ serverRouter.get("/stdio", async (req, res) => {
 
     // Handle cleanup when connection closes
     const handleConnectionClose = () => {
-      const mcpServerName =
-        (req.query.mcpServerName as string) || "Unknown Server";
-      console.log(
-        `Connection closed for session ${webAppTransport.sessionId}, MCP server: ${mcpServerName}`,
-      );
-      cleanupSession(webAppTransport.sessionId, mcpServerName);
+      console.log(`Connection closed for session ${webAppTransport.sessionId}`);
+      cleanupSession(webAppTransport.sessionId);
     };
 
     // Handle various connection termination scenarios
@@ -421,9 +413,7 @@ serverRouter.get("/stdio", async (req, res) => {
       transportToClient: webAppTransport,
       transportToServer: serverTransport,
       onCleanup: async () => {
-        const mcpServerName =
-          (req.query.mcpServerName as string) || "Unknown Server";
-        await cleanupSession(webAppTransport.sessionId, mcpServerName);
+        await cleanupSession(webAppTransport.sessionId);
       },
     });
   } catch (error) {
@@ -475,12 +465,10 @@ serverRouter.get("/sse", async (req, res) => {
 
       // Handle cleanup when connection closes
       const handleConnectionClose = () => {
-        const mcpServerName =
-          (req.query.mcpServerName as string) || "Unknown Server";
         console.log(
-          `Connection closed for session ${webAppTransport.sessionId}, MCP server: ${mcpServerName}`,
+          `Connection closed for session ${webAppTransport.sessionId}`,
         );
-        cleanupSession(webAppTransport.sessionId, mcpServerName);
+        cleanupSession(webAppTransport.sessionId);
       };
 
       // Handle various connection termination scenarios
@@ -500,9 +488,7 @@ serverRouter.get("/sse", async (req, res) => {
         transportToClient: webAppTransport,
         transportToServer: serverTransport,
         onCleanup: async () => {
-          const mcpServerName =
-            (req.query.mcpServerName as string) || "Unknown Server";
-          await cleanupSession(webAppTransport.sessionId, mcpServerName);
+          await cleanupSession(webAppTransport.sessionId);
         },
       });
     }

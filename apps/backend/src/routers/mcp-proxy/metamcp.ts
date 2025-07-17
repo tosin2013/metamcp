@@ -60,7 +60,7 @@ const cleanupSession = async (sessionId: string) => {
 };
 
 metamcpRouter.get("/:uuid/mcp", async (req, res) => {
-  const namespaceUuid = req.params.uuid;
+  // const namespaceUuid = req.params.uuid;
   const sessionId = req.headers["mcp-session-id"] as string;
   // console.log(
   //   `Received GET message for MetaMCP namespace ${namespaceUuid} sessionId ${sessionId}`,
@@ -233,7 +233,7 @@ metamcpRouter.get("/:uuid/sse", async (req, res) => {
 });
 
 metamcpRouter.post("/:uuid/message", async (req, res) => {
-  const namespaceUuid = req.params.uuid;
+  // const namespaceUuid = req.params.uuid;
   try {
     const sessionId = req.query.sessionId;
     // console.log(
