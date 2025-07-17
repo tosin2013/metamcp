@@ -70,6 +70,10 @@ export default function EndpointsPage() {
           name: "",
           description: "",
           namespaceUuid: "",
+          enableApiKeyAuth: true,
+          enableOauth: false,
+          useQueryParamAuth: false,
+          createMcpServer: true,
           user_id: undefined, // Default to "For myself" (Private)
         });
         setSelectedNamespaceUuid("");
@@ -103,6 +107,7 @@ export default function EndpointsPage() {
       description: "",
       namespaceUuid: "",
       enableApiKeyAuth: true,
+      enableOauth: false,
       useQueryParamAuth: false,
       createMcpServer: true,
       user_id: undefined, // Default to "For myself" (Private)
@@ -118,6 +123,7 @@ export default function EndpointsPage() {
         description: data.description,
         namespaceUuid: data.namespaceUuid,
         enableApiKeyAuth: data.enableApiKeyAuth,
+        enableOauth: data.enableOauth,
         useQueryParamAuth: data.useQueryParamAuth,
         createMcpServer: data.createMcpServer,
         user_id: data.user_id,
@@ -154,6 +160,7 @@ export default function EndpointsPage() {
       description: "",
       namespaceUuid: "",
       enableApiKeyAuth: true,
+      enableOauth: false,
       useQueryParamAuth: false,
       createMcpServer: true,
       user_id: undefined, // Default to "For myself" (Private)
@@ -374,6 +381,32 @@ export default function EndpointsPage() {
                       />
                     </div>
                   )}
+                </div>
+
+                {/* OAuth Authentication Settings */}
+                <div className="space-y-4 border-t pt-4">
+                  <h4 className="text-sm font-medium">
+                    {t("endpoints:oauthAuth")}
+                  </h4>
+
+                  {/* Enable OAuth Auth */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">
+                        {t("endpoints:enableOauth")}
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("endpoints:oauthAuthDescription")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.watch("enableOauth")}
+                      onCheckedChange={(checked) =>
+                        form.setValue("enableOauth", checked)
+                      }
+                      disabled={isSubmitting}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">

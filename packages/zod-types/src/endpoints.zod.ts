@@ -9,6 +9,7 @@ export const createEndpointFormSchema = z.object({
   description: z.string().optional(),
   namespaceUuid: z.string().uuid("Please select a valid namespace"),
   enableApiKeyAuth: z.boolean(),
+  enableOauth: z.boolean(),
   useQueryParamAuth: z.boolean(),
   createMcpServer: z.boolean(),
   user_id: z.string().nullable().optional(),
@@ -22,6 +23,7 @@ export const editEndpointFormSchema = z.object({
   description: z.string().optional(),
   namespaceUuid: z.string().uuid("Please select a valid namespace"),
   enableApiKeyAuth: z.boolean().optional(),
+  enableOauth: z.boolean().optional(),
   useQueryParamAuth: z.boolean().optional(),
   user_id: z.string().nullable().optional(),
 });
@@ -34,6 +36,7 @@ export const CreateEndpointRequestSchema = z.object({
   description: z.string().optional(),
   namespaceUuid: z.string().uuid(),
   enableApiKeyAuth: z.boolean().default(true),
+  enableOauth: z.boolean().default(false),
   useQueryParamAuth: z.boolean().default(false),
   createMcpServer: z.boolean().default(true),
   user_id: z.string().nullable().optional(),
@@ -45,6 +48,7 @@ export const EndpointSchema = z.object({
   description: z.string().nullable(),
   namespace_uuid: z.string(),
   enable_api_key_auth: z.boolean(),
+  enable_oauth: z.boolean(),
   use_query_param_auth: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -89,6 +93,7 @@ export const UpdateEndpointRequestSchema = z.object({
   description: z.string().optional(),
   namespaceUuid: z.string().uuid(),
   enableApiKeyAuth: z.boolean().optional(),
+  enableOauth: z.boolean().optional(),
   useQueryParamAuth: z.boolean().optional(),
   user_id: z.string().nullable().optional(),
 });
@@ -134,6 +139,7 @@ export const EndpointCreateInputSchema = z.object({
   description: z.string().nullable().optional(),
   namespace_uuid: z.string(),
   enable_api_key_auth: z.boolean().optional().default(true),
+  enable_oauth: z.boolean().optional().default(false),
   use_query_param_auth: z.boolean().optional().default(false),
   user_id: z.string().nullable().optional(),
 });
@@ -144,6 +150,7 @@ export const EndpointUpdateInputSchema = z.object({
   description: z.string().nullable().optional(),
   namespace_uuid: z.string(),
   enable_api_key_auth: z.boolean().optional(),
+  enable_oauth: z.boolean().optional(),
   use_query_param_auth: z.boolean().optional(),
   user_id: z.string().nullable().optional(),
 });
@@ -158,6 +165,7 @@ export const DatabaseEndpointSchema = z.object({
   description: z.string().nullable(),
   namespace_uuid: z.string(),
   enable_api_key_auth: z.boolean(),
+  enable_oauth: z.boolean(),
   use_query_param_auth: z.boolean(),
   created_at: z.date(),
   updated_at: z.date(),

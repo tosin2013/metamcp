@@ -234,6 +234,7 @@ export const endpointsTable = pgTable(
       .notNull()
       .references(() => namespacesTable.uuid, { onDelete: "cascade" }),
     enable_api_key_auth: boolean("enable_api_key_auth").notNull().default(true),
+    enable_oauth: boolean("enable_oauth").notNull().default(false),
     use_query_param_auth: boolean("use_query_param_auth")
       .notNull()
       .default(false),

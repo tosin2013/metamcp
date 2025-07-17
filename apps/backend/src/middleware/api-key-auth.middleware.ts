@@ -161,8 +161,8 @@ export const authenticateApiKey = async (
       return next();
     }
 
-    // API key failed, try OAuth token validation
-    if (!isApiKey || !authResult?.valid) {
+    // API key failed, try OAuth token validation if OAuth is enabled
+    if ((!isApiKey || !authResult?.valid) && endpoint.enable_oauth) {
       const oauthResult = await validateOAuthToken(authToken, req);
 
       if (oauthResult.valid) {
@@ -171,7 +171,7 @@ export const authenticateApiKey = async (
         authReq.authMethod = "oauth";
 
         // Perform OAuth access control checks
-        const accessCheckResult = checkOAuthAccess(oauthResult, endpoint);
+        const accessCheckResult = checkOAuthAccess(oauthResult);
         if (!accessCheckResult.allowed) {
           return res.status(403).json({
             error: "insufficient_scope",
@@ -231,10 +231,10 @@ function checkApiKeyAccess(
 /**
  * Check if OAuth token has required scopes for the endpoint
  */
-function checkOAuthAccess(
-  oauthResult: { user_id?: string; scopes?: string[] },
-  endpoint: DatabaseEndpoint,
-): { allowed: boolean; message?: string } {
+function checkOAuthAccess(oauthResult: {
+  user_id?: string;
+  scopes?: string[];
+}): { allowed: boolean; message?: string } {
   const scopes = oauthResult.scopes || [];
 
   // Check for admin access - with admin scope, user can access any endpoint
@@ -261,30 +261,32 @@ function sendAuthenticationChallenge(
 
   // Build challenge header according to RFC 9728
   const challenges = [];
+  const authMethods = ["X-API-Key header"];
 
-  // OAuth Bearer challenge with resource metadata
-  challenges.push(
-    `Bearer realm="MetaMCP", ` +
-      `resource_metadata="${resourceMetadataUrl}", ` +
-      `scope="admin"`,
-  );
+  // OAuth Bearer challenge with resource metadata (only if OAuth is enabled)
+  if (endpoint.enable_oauth) {
+    challenges.push(
+      `Bearer realm="MetaMCP", ` +
+        `resource_metadata="${resourceMetadataUrl}", ` +
+        `scope="admin"`,
+    );
+    authMethods.unshift("Authorization header (Bearer token)");
+    res.set("WWW-Authenticate", `Bearer realm="MetaMCP", ` + `scope="admin"`);
+  }
 
   // API key methods
-  const authMethods = [
-    "Authorization header (Bearer token)",
-    "X-API-Key header",
-  ];
   if (endpoint.use_query_param_auth) {
     authMethods.push("query parameter (api_key or apikey)");
   }
 
-  res.set("WWW-Authenticate", `Bearer realm="MetaMCP", ` + `scope="admin"`);
+  const errorDescription = endpoint.enable_oauth
+    ? "Authentication required via OAuth bearer token or API key"
+    : "Authentication required via API key";
 
   return res.status(401).json({
     error: "authentication_required",
-    error_description:
-      "Authentication required via OAuth bearer token or API key",
-    resource_metadata: resourceMetadataUrl,
+    error_description: errorDescription,
+    resource_metadata: endpoint.enable_oauth ? resourceMetadataUrl : undefined,
     supported_methods: authMethods,
     timestamp: new Date().toISOString(),
   });
