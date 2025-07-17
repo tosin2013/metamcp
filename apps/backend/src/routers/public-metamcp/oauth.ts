@@ -29,21 +29,37 @@ setInterval(
   5 * 60 * 1000,
 );
 
-// Add JSON parsing middleware for POST endpoints
-oauthMetadataRouter.use(
-  express.json({
-    limit: "10mb",
-    type: "application/json",
-  }),
-);
+// Add JSON parsing middleware only for OAuth-specific routes that need it
+oauthMetadataRouter.use((req, res, next) => {
+  // Only apply JSON parsing for OAuth POST endpoints that need parsed body
+  const needsJsonParsing =
+    (req.path.startsWith("/oauth/") && req.method === "POST") ||
+    (req.path === "/oauth/register" && req.method === "POST");
 
-// Add URL-encoded form parsing for OAuth standard compatibility
-oauthMetadataRouter.use(
-  express.urlencoded({
-    extended: true,
-    limit: "10mb",
-  }),
-);
+  if (needsJsonParsing) {
+    return express.json({
+      limit: "10mb",
+      type: "application/json",
+    })(req, res, next);
+  }
+  next();
+});
+
+// Add URL-encoded form parsing middleware only for OAuth POST endpoints
+oauthMetadataRouter.use((req, res, next) => {
+  // Only apply URL-encoded parsing for OAuth POST endpoints
+  const needsUrlencodedParsing =
+    (req.path.startsWith("/oauth/") && req.method === "POST") ||
+    (req.path === "/oauth/register" && req.method === "POST");
+
+  if (needsUrlencodedParsing) {
+    return express.urlencoded({
+      extended: true,
+      limit: "10mb",
+    })(req, res, next);
+  }
+  next();
+});
 
 // // Debug middleware to log request details
 // oauthMetadataRouter.use((req, res, next) => {
