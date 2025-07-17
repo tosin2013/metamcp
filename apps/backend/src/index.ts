@@ -89,8 +89,14 @@ app.listen(12009, async () => {
   );
   console.log(`tRPC routes available at: http://localhost:12009/trpc`);
 
-  // Initialize idle servers after server starts
-  await initializeIdleServers();
+  // Wait a moment for the server to be fully ready to handle incoming connections,
+  // then initialize idle servers (prevents connection errors when MCP servers connect back)
+  console.log(
+    "Waiting for server to be fully ready before initializing idle servers...",
+  );
+  await new Promise((resolve) => setTimeout(resolve, 3000)).then(
+    initializeIdleServers,
+  );
 });
 
 app.get("/health", (req, res) => {
