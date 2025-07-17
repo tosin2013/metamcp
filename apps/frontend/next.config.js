@@ -14,6 +14,11 @@ const nextConfig = {
         source: "/api/auth/:path*",
         destination: `${backendUrl}/api/auth/:path*`,
       },
+      // OAuth discovery endpoints - must be at root level
+      {
+        source: "/.well-known/:path*",
+        destination: `${backendUrl}/metamcp/.well-known/:path*`,
+      },
       {
         source: "/trpc/:path*",
         destination: `${backendUrl}/trpc/frontend/:path*`,

@@ -3,6 +3,29 @@ import express from "express";
 const oauthMetadataRouter = express.Router();
 
 /**
+ * Helper function to get the correct base URL from request
+ * Prioritizes APP_URL environment variable, then checks proxy headers
+ */
+function getBaseUrl(req: express.Request): string {
+  // Prioritize APP_URL environment variable
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+
+  // Check for forwarded headers from Next.js proxy
+  const forwardedHost = req.headers["x-forwarded-host"] as string;
+  const forwardedProto = req.headers["x-forwarded-proto"] as string;
+
+  if (forwardedHost) {
+    const protocol = forwardedProto || "http";
+    return `${protocol}://${forwardedHost}`;
+  }
+
+  // Fallback to request host
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+/**
  * OAuth 2.0 Protected Resource Metadata endpoint
  * Implementation follows RFC 9728 and MCP OAuth specification
  * https://datatracker.ietf.org/doc/rfc9728/
@@ -12,7 +35,7 @@ oauthMetadataRouter.get(
   "/.well-known/oauth-protected-resource",
   async (req, res) => {
     try {
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const baseUrl = getBaseUrl(req);
 
       // For the basic implementation, we'll point to our better-auth OAuth server
       // In a production environment, this could point to external authorization servers
@@ -75,8 +98,7 @@ oauthMetadataRouter.get(
   "/.well-known/oauth-authorization-server",
   async (req, res) => {
     try {
-      const baseUrl =
-        process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+      const baseUrl = getBaseUrl(req);
 
       const metadata = {
         // Issuer identifier

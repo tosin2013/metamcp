@@ -18,6 +18,29 @@ export interface ApiKeyAuthenticatedRequest extends express.Request {
 const apiKeysRepository = new ApiKeysRepository();
 
 /**
+ * Helper function to get the correct base URL from request
+ * Prioritizes APP_URL environment variable, then checks proxy headers
+ */
+function getBaseUrl(req: express.Request): string {
+  // Prioritize APP_URL environment variable
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+
+  // Check for forwarded headers from Next.js proxy
+  const forwardedHost = req.headers["x-forwarded-host"] as string;
+  const forwardedProto = req.headers["x-forwarded-proto"] as string;
+
+  if (forwardedHost) {
+    const protocol = forwardedProto || "http";
+    return `${protocol}://${forwardedHost}`;
+  }
+
+  // Fallback to request host
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+/**
  * Validates OAuth bearer token using better-auth session validation
  * @param token OAuth bearer token
  * @param req Express request object
@@ -34,10 +57,8 @@ async function validateOAuthToken(
 }> {
   try {
     // Create a mock request to validate the OAuth token using better-auth
-    const sessionUrl = new URL(
-      "/api/auth/get-session",
-      `http://${req.headers.host}`,
-    );
+    const baseUrl = getBaseUrl(req);
+    const sessionUrl = new URL("/api/auth/get-session", baseUrl);
 
     const headers = new Headers();
     headers.set("authorization", `Bearer ${token}`);
@@ -89,8 +110,8 @@ export const authenticateApiKey = async (
   const authReq = req as ApiKeyAuthenticatedRequest;
   const endpoint = authReq.endpoint;
 
-  // Skip authentication if not enabled for this endpoint
-  if (!endpoint?.enable_api_key_auth) {
+  // Skip authentication if neither method is enabled for this endpoint
+  if (!endpoint?.enable_api_key_auth && !endpoint?.enable_oauth) {
     return next();
   }
 
@@ -128,41 +149,46 @@ export const authenticateApiKey = async (
       return sendAuthenticationChallenge(req, res, endpoint);
     }
 
-    // Try API key authentication first
+    // Try API key authentication first (only if enabled)
     let authResult: {
       valid: boolean;
       user_id?: string | null;
       key_uuid?: string;
     } | null = null;
 
-    if (isApiKey) {
-      authResult = await apiKeysRepository.validateApiKey(authToken);
-    } else {
-      // Try API key validation first even for Bearer tokens (backwards compatibility)
-      authResult = await apiKeysRepository.validateApiKey(authToken);
-    }
-
-    if (authResult?.valid) {
-      // API key authentication successful
-      authReq.apiKeyUserId = authResult.user_id || undefined;
-      authReq.apiKeyUuid = authResult.key_uuid;
-      authReq.authMethod = "api_key";
-
-      // Perform API key access control checks
-      const accessCheckResult = checkApiKeyAccess(authResult, endpoint);
-      if (!accessCheckResult.allowed) {
-        return res.status(403).json({
-          error: "Access denied",
-          message: accessCheckResult.message,
-          timestamp: new Date().toISOString(),
-        });
+    if (endpoint.enable_api_key_auth) {
+      if (isApiKey) {
+        authResult = await apiKeysRepository.validateApiKey(authToken);
+      } else {
+        // Try API key validation first even for Bearer tokens (backwards compatibility)
+        authResult = await apiKeysRepository.validateApiKey(authToken);
       }
 
-      return next();
+      if (authResult?.valid) {
+        // API key authentication successful
+        authReq.apiKeyUserId = authResult.user_id || undefined;
+        authReq.apiKeyUuid = authResult.key_uuid;
+        authReq.authMethod = "api_key";
+
+        // Perform API key access control checks
+        const accessCheckResult = checkApiKeyAccess(authResult, endpoint);
+        if (!accessCheckResult.allowed) {
+          return res.status(403).json({
+            error: "Access denied",
+            message: accessCheckResult.message,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        return next();
+      }
     }
 
-    // API key failed, try OAuth token validation if OAuth is enabled
-    if ((!isApiKey || !authResult?.valid) && endpoint.enable_oauth) {
+    // If API key failed or not enabled, try OAuth token validation if OAuth is enabled
+    if (
+      (!authResult?.valid || !endpoint.enable_api_key_auth) &&
+      endpoint.enable_oauth
+    ) {
       const oauthResult = await validateOAuthToken(authToken, req);
 
       if (oauthResult.valid) {
@@ -256,7 +282,7 @@ function sendAuthenticationChallenge(
   res: express.Response,
   endpoint: DatabaseEndpoint,
 ): express.Response {
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const baseUrl = getBaseUrl(req);
   const resourceMetadataUrl = `${baseUrl}/.well-known/oauth-protected-resource`;
 
   // Build challenge header according to RFC 9728
