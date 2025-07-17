@@ -407,6 +407,15 @@ export default function EndpointsPage() {
                       disabled={isSubmitting}
                     />
                   </div>
+
+                  {/* OAuth HTTPS Warning */}
+                  {form.watch("enableOauth") && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        {t("endpoints:oauthHttpsWarning")}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2">

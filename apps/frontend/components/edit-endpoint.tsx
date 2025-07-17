@@ -372,6 +372,15 @@ export function EditEndpoint({
                   disabled={isUpdating}
                 />
               </div>
+
+              {/* OAuth HTTPS Warning */}
+              {editForm.watch("enableOauth") && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800">
+                    {t("endpoints:edit.oauthHttpsWarning")}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
