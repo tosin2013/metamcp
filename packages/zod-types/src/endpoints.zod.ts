@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { NamespaceSchema, DatabaseNamespaceSchema } from "./namespaces.zod";
+import { DatabaseNamespaceSchema, NamespaceSchema } from "./namespaces.zod";
 
 // Endpoint schema definitions
 export const createEndpointFormSchema = z.object({

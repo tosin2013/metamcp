@@ -56,7 +56,57 @@ async function validateOAuthToken(
   error?: string;
 }> {
   try {
-    // Create a mock request to validate the OAuth token using better-auth
+    // Check if this is our MCP OAuth token format
+    if (token.startsWith("mcp_token_")) {
+      console.log(
+        "Validating MCP OAuth token:",
+        token.substring(0, 20) + "...",
+      );
+
+      // For MCP tokens, use introspection endpoint to validate
+      // This allows us to check against the stored token data
+      try {
+        const baseUrl = getBaseUrl(req);
+        const introspectUrl = new URL("/metamcp/oauth/introspect", baseUrl);
+
+        const introspectRequest = new Request(introspectUrl.toString(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        const introspectResponse = await fetch(introspectRequest);
+
+        if (!introspectResponse.ok) {
+          return { valid: false, error: "Token introspection failed" };
+        }
+
+        const introspectData = (await introspectResponse.json()) as {
+          active?: boolean;
+          sub?: string;
+          scope?: string;
+        };
+
+        if (!introspectData.active) {
+          return { valid: false, error: "Token is not active" };
+        }
+
+        return {
+          valid: true,
+          user_id: introspectData.sub,
+          scopes: introspectData.scope
+            ? introspectData.scope.split(" ")
+            : ["admin"],
+        };
+      } catch (error) {
+        console.error("Error introspecting MCP token:", error);
+        return { valid: false, error: "Token validation failed" };
+      }
+    }
+
+    // Try to validate as better-auth session token
     const baseUrl = getBaseUrl(req);
     const sessionUrl = new URL("/api/auth/get-session", baseUrl);
 
@@ -80,8 +130,7 @@ async function validateOAuthToken(
       return { valid: false, error: "No valid user session found" };
     }
 
-    // For now, we'll grant admin scope to all authenticated users
-    // This provides full access without complex scope management
+    // For better-auth sessions, grant admin scope to all authenticated users
     const scopes = ["admin"];
 
     return {
@@ -283,26 +332,33 @@ function sendAuthenticationChallenge(
   endpoint: DatabaseEndpoint,
 ): express.Response {
   const baseUrl = getBaseUrl(req);
-  const resourceMetadataUrl = `${baseUrl}/.well-known/oauth-protected-resource`;
 
-  // Build challenge header according to RFC 9728
-  const challenges = [];
-  const authMethods = ["X-API-Key header"];
+  // Determine which authentication methods are available
+  const authMethods = [];
 
-  // OAuth Bearer challenge with resource metadata (only if OAuth is enabled)
+  // OAuth Bearer challenge (if OAuth is enabled)
   if (endpoint.enable_oauth) {
-    challenges.push(
-      `Bearer realm="MetaMCP", ` +
-        `resource_metadata="${resourceMetadataUrl}", ` +
-        `scope="admin"`,
-    );
-    authMethods.unshift("Authorization header (Bearer token)");
-    res.set("WWW-Authenticate", `Bearer realm="MetaMCP", ` + `scope="admin"`);
+    authMethods.push("Authorization header (Bearer token)");
+
+    // Set WWW-Authenticate header with proper OAuth Bearer challenge
+    // According to MCP OAuth spec and RFC 6750, this should trigger OAuth flow
+    const bearerChallenge = [
+      `Bearer realm="MetaMCP"`,
+      `scope="admin"`,
+      `resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+    ].join(", ");
+
+    res.set("WWW-Authenticate", bearerChallenge);
   }
 
-  // API key methods
-  if (endpoint.use_query_param_auth) {
-    authMethods.push("query parameter (api_key or apikey)");
+  // API key methods (if enabled)
+  if (endpoint.enable_api_key_auth) {
+    authMethods.push("X-API-Key header");
+
+    // Add query parameter auth method if enabled
+    if (endpoint.use_query_param_auth) {
+      authMethods.push("query parameter (api_key or apikey)");
+    }
   }
 
   const errorDescription = endpoint.enable_oauth
@@ -312,7 +368,9 @@ function sendAuthenticationChallenge(
   return res.status(401).json({
     error: "authentication_required",
     error_description: errorDescription,
-    resource_metadata: endpoint.enable_oauth ? resourceMetadataUrl : undefined,
+    resource_metadata: endpoint.enable_oauth
+      ? `${baseUrl}/.well-known/oauth-protected-resource`
+      : undefined,
     supported_methods: authMethods,
     timestamp: new Date().toISOString(),
   });
