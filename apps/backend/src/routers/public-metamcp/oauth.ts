@@ -126,37 +126,29 @@ oauthMetadataRouter.get(
         // MCP-compatible OAuth endpoints (proxied through frontend)
         authorization_endpoint: `${baseUrl}/oauth/authorize`,
         token_endpoint: `${baseUrl}/oauth/token`,
-
-        // User info endpoint
-        userinfo_endpoint: `${baseUrl}/oauth/userinfo`,
-
-        // Supported grant types for MCP
-        grant_types_supported: ["authorization_code", "client_credentials"],
+        registration_endpoint: `${baseUrl}/oauth/register`,
 
         // Supported response types (required by RFC 8414)
         response_types_supported: ["code"],
 
-        // Supported scopes for MCP
-        scopes_supported: ["admin"],
+        // Supported response modes
+        response_modes_supported: ["query"],
 
-        // Code challenge methods - PKCE is required for MCP (required by RFC 8414)
-        code_challenge_methods_supported: ["S256"],
+        // Supported grant types for MCP
+        grant_types_supported: ["authorization_code", "refresh_token"],
 
         // Authentication methods
         token_endpoint_auth_methods_supported: [
-          "none", // For public clients with PKCE
-          "client_secret_post",
           "client_secret_basic",
+          "client_secret_post",
+          "none",
         ],
 
-        // PKCE is required for all clients per MCP spec
-        require_proof_key_for_code_exchange: true,
+        // Token revocation endpoint
+        revocation_endpoint: `${baseUrl}/oauth/revoke`,
 
-        // Additional metadata for compatibility
-        authorization_response_iss_parameter_supported: false,
-
-        // Service documentation
-        service_documentation: `${baseUrl}/docs/oauth`,
+        // Code challenge methods - PKCE support
+        code_challenge_methods_supported: ["plain", "S256"],
       };
 
       res.set({
@@ -219,6 +211,23 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
         error: "invalid_request",
         error_description:
           "Missing required parameters: client_id or redirect_uri",
+      });
+    }
+
+    // Validate client_id against registered clients
+    const clientData = registeredClients.get(client_id as string);
+    if (!clientData) {
+      return res.status(400).json({
+        error: "invalid_client",
+        error_description: "Client not found or not registered",
+      });
+    }
+
+    // Validate redirect_uri against registered redirect_uris
+    if (!clientData.redirect_uris.includes(redirect_uri as string)) {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: "redirect_uri is not registered for this client",
       });
     }
 
@@ -335,6 +344,51 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
         error_description: "Redirect URI does not match",
       });
     }
+
+    // Validate client_id against registered clients
+    const clientData = registeredClients.get(client_id);
+    if (!clientData) {
+      return res.status(400).json({
+        error: "invalid_client",
+        error_description: "Client not found or not registered",
+      });
+    }
+
+    // Validate client authentication based on registered auth method
+    if (clientData.token_endpoint_auth_method === "client_secret_basic") {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Basic ")) {
+        return res.status(401).json({
+          error: "invalid_client",
+          error_description: "Client authentication required via Basic auth",
+        });
+      }
+
+      const credentials = Buffer.from(
+        authHeader.substring(6),
+        "base64",
+      ).toString();
+      const [authClientId, authClientSecret] = credentials.split(":");
+
+      if (
+        authClientId !== client_id ||
+        authClientSecret !== clientData.client_secret
+      ) {
+        return res.status(401).json({
+          error: "invalid_client",
+          error_description: "Invalid client credentials",
+        });
+      }
+    } else if (clientData.token_endpoint_auth_method === "client_secret_post") {
+      const { client_secret } = req.body;
+      if (!client_secret || client_secret !== clientData.client_secret) {
+        return res.status(401).json({
+          error: "invalid_client",
+          error_description: "Invalid client secret",
+        });
+      }
+    }
+    // For "none" auth method, no additional validation needed
 
     // Verify PKCE if code_challenge was provided
     if (codeData.code_challenge) {
@@ -667,6 +721,216 @@ const accessTokens = new Map<
     expires_at: number;
   }
 >();
+
+// Store for registered OAuth clients (in production, use a database)
+const registeredClients = new Map<
+  string,
+  {
+    client_id: string;
+    client_secret?: string;
+    client_name?: string;
+    redirect_uris: string[];
+    grant_types: string[];
+    response_types: string[];
+    token_endpoint_auth_method: string;
+    scope?: string;
+    client_uri?: string;
+    logo_uri?: string;
+    contacts?: string[];
+    tos_uri?: string;
+    policy_uri?: string;
+    software_id?: string;
+    software_version?: string;
+    created_at: number;
+  }
+>();
+
+/**
+ * OAuth 2.0 Dynamic Client Registration Endpoint
+ * Allows clients to dynamically register with the authorization server
+ * Implementation follows RFC 7591
+ */
+oauthMetadataRouter.post("/oauth/register", async (req, res) => {
+  try {
+    const {
+      redirect_uris,
+      response_types,
+      grant_types,
+      application_type,
+      client_name,
+      client_uri,
+      logo_uri,
+      scope,
+      contacts,
+      tos_uri,
+      policy_uri,
+      token_endpoint_auth_method,
+      software_id,
+      software_version,
+    } = req.body;
+
+    console.log("OAuth client registration request:", {
+      client_name,
+      redirect_uris,
+      grant_types,
+      response_types,
+    });
+
+    // Validate required parameters
+    if (
+      !redirect_uris ||
+      !Array.isArray(redirect_uris) ||
+      redirect_uris.length === 0
+    ) {
+      return res.status(400).json({
+        error: "invalid_redirect_uri",
+        error_description:
+          "redirect_uris is required and must be a non-empty array",
+      });
+    }
+
+    // Validate redirect URIs
+    for (const uri of redirect_uris) {
+      try {
+        const parsedUri = new URL(uri);
+        // For security, we might want to restrict certain schemes or domains
+        if (!["http:", "https:", "custom:"].includes(parsedUri.protocol)) {
+          return res.status(400).json({
+            error: "invalid_redirect_uri",
+            error_description: `Invalid redirect URI scheme: ${parsedUri.protocol}`,
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          error: "invalid_redirect_uri",
+          error_description: `Invalid redirect URI format: ${uri}`,
+        });
+      }
+    }
+
+    // Set defaults for optional parameters
+    const clientGrantTypes =
+      grant_types && Array.isArray(grant_types)
+        ? grant_types
+        : ["authorization_code"];
+
+    const clientResponseTypes =
+      response_types && Array.isArray(response_types)
+        ? response_types
+        : ["code"];
+
+    const clientTokenEndpointAuthMethod = token_endpoint_auth_method || "none";
+
+    // Validate grant types and response types consistency
+    const validGrantTypes = [
+      "authorization_code",
+      "refresh_token",
+      "client_credentials",
+    ];
+    const validResponseTypes = ["code"];
+    const validAuthMethods = [
+      "none",
+      "client_secret_post",
+      "client_secret_basic",
+    ];
+
+    for (const grantType of clientGrantTypes) {
+      if (!validGrantTypes.includes(grantType)) {
+        return res.status(400).json({
+          error: "invalid_request",
+          error_description: `Unsupported grant type: ${grantType}`,
+        });
+      }
+    }
+
+    for (const responseType of clientResponseTypes) {
+      if (!validResponseTypes.includes(responseType)) {
+        return res.status(400).json({
+          error: "invalid_request",
+          error_description: `Unsupported response type: ${responseType}`,
+        });
+      }
+    }
+
+    if (!validAuthMethods.includes(clientTokenEndpointAuthMethod)) {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: `Unsupported token endpoint auth method: ${clientTokenEndpointAuthMethod}`,
+      });
+    }
+
+    // Generate client credentials
+    const clientId = `mcp_client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Generate client secret only if auth method requires it
+    let clientSecret: string | undefined;
+    if (clientTokenEndpointAuthMethod !== "none") {
+      clientSecret = `mcp_secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
+    }
+
+    // Create client registration
+    const clientRegistration = {
+      client_id: clientId,
+      client_secret: clientSecret,
+      client_name: client_name || "Unnamed MCP Client",
+      redirect_uris: redirect_uris,
+      grant_types: clientGrantTypes,
+      response_types: clientResponseTypes,
+      token_endpoint_auth_method: clientTokenEndpointAuthMethod,
+      scope: scope || "admin",
+      client_uri,
+      logo_uri,
+      contacts: contacts && Array.isArray(contacts) ? contacts : undefined,
+      tos_uri,
+      policy_uri,
+      software_id,
+      software_version,
+      created_at: Date.now(),
+    };
+
+    // Store the client registration
+    registeredClients.set(clientId, clientRegistration);
+
+    console.log("OAuth client registered successfully:", {
+      client_id: clientId,
+      client_name: client_name || "Unnamed MCP Client",
+      redirect_uris,
+    });
+
+    // Prepare response according to RFC 7591
+    const response: any = {
+      client_id: clientId,
+      client_name: clientRegistration.client_name,
+      redirect_uris: clientRegistration.redirect_uris,
+      grant_types: clientRegistration.grant_types,
+      response_types: clientRegistration.response_types,
+      token_endpoint_auth_method: clientRegistration.token_endpoint_auth_method,
+      scope: clientRegistration.scope,
+    };
+
+    // Include client_secret only if one was generated
+    if (clientSecret) {
+      response.client_secret = clientSecret;
+    }
+
+    // Include optional metadata if provided
+    if (client_uri) response.client_uri = client_uri;
+    if (logo_uri) response.logo_uri = logo_uri;
+    if (contacts) response.contacts = contacts;
+    if (tos_uri) response.tos_uri = tos_uri;
+    if (policy_uri) response.policy_uri = policy_uri;
+    if (software_id) response.software_id = software_id;
+    if (software_version) response.software_version = software_version;
+
+    res.status(201).json(response);
+  } catch (error) {
+    console.error("Error in OAuth registration endpoint:", error);
+    res.status(500).json({
+      error: "server_error",
+      error_description: "Internal server error during client registration",
+    });
+  }
+});
 
 /**
  * OAuth 2.0 UserInfo Endpoint
