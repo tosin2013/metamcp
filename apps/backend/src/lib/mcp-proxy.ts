@@ -45,14 +45,22 @@ export default function mcpProxy({
 
   // Helper function to safely trigger cleanup once
   const triggerCleanup = async () => {
-    if (cleanupCalled || !onCleanup) {
+    if (cleanupCalled) {
+      console.debug("Cleanup already called, skipping");
+      return;
+    }
+    if (!onCleanup) {
+      console.debug("No cleanup callback provided, skipping");
       return;
     }
     cleanupCalled = true;
 
     try {
-      console.debug("Triggering MCP proxy cleanup due to connection failure");
+      console.debug(
+        "Triggering MCP proxy cleanup (server session/subprocess cleanup)",
+      );
       await onCleanup();
+      console.debug("MCP proxy cleanup completed successfully");
     } catch (error) {
       console.error("Error during MCP proxy cleanup:", error);
     }
@@ -144,24 +152,26 @@ export default function mcpProxy({
   };
 
   transportToClient.onclose = async () => {
-    if (transportToServerClosed) {
-      return;
+    console.debug("Client transport closed");
+    if (!transportToClientClosed) {
+      transportToClientClosed = true;
+      if (!transportToServerClosed) {
+        console.debug("Closing server transport due to client close");
+        await transportToServer.close().catch(onServerError);
+      }
     }
-
-    console.debug("Client transport closed, closing server transport");
-    transportToClientClosed = true;
-    await transportToServer.close().catch(onServerError);
     await triggerCleanup();
   };
 
   transportToServer.onclose = async () => {
-    if (transportToClientClosed) {
-      return;
+    console.debug("Server transport closed");
+    if (!transportToServerClosed) {
+      transportToServerClosed = true;
+      if (!transportToClientClosed) {
+        console.debug("Closing client transport due to server close");
+        await transportToClient.close().catch(onClientError);
+      }
     }
-
-    console.debug("Server transport closed, closing client transport");
-    transportToServerClosed = true;
-    await transportToClient.close().catch(onClientError);
     await triggerCleanup();
   };
 
