@@ -58,11 +58,6 @@ async function validateOAuthToken(
   try {
     // Check if this is our MCP OAuth token format
     if (token.startsWith("mcp_token_")) {
-      console.log(
-        "Validating MCP OAuth token:",
-        token.substring(0, 20) + "...",
-      );
-
       // For MCP tokens, use introspection endpoint to validate
       // This allows us to check against the stored token data
       try {
