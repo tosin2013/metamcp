@@ -1,5 +1,5 @@
+import { createHash, randomBytes } from "crypto";
 import express from "express";
-import { randomBytes, createHash } from "crypto";
 
 // OAuth 2.0 Authorization Parameters interface
 export interface OAuthParams {
@@ -51,20 +51,26 @@ export function generateSecureClientSecret(): string {
  * Validate redirect URI according to OAuth 2.1 security requirements
  * Prevents open redirect vulnerabilities
  */
-export function validateRedirectUri(uri: string, allowedHosts?: string[]): boolean {
+export function validateRedirectUri(
+  uri: string,
+  allowedHosts?: string[],
+): boolean {
   try {
     const parsedUri = new URL(uri);
-    
+
     // Only allow secure schemes (no custom: schemes)
     if (!["https:", "http:"].includes(parsedUri.protocol)) {
       return false;
     }
-    
+
     // For production, only allow HTTPS
-    if (process.env.NODE_ENV === "production" && parsedUri.protocol !== "https:") {
+    if (
+      process.env.NODE_ENV === "production" &&
+      parsedUri.protocol !== "https:"
+    ) {
       return false;
     }
-    
+
     // Prevent localhost/private IPs in production
     if (process.env.NODE_ENV === "production") {
       const hostname = parsedUri.hostname.toLowerCase();
@@ -79,12 +85,12 @@ export function validateRedirectUri(uri: string, allowedHosts?: string[]): boole
         return false;
       }
     }
-    
+
     // Check against allowed hosts if provided
     if (allowedHosts && allowedHosts.length > 0) {
       return allowedHosts.includes(parsedUri.hostname);
     }
-    
+
     return true;
   } catch {
     return false;
@@ -95,7 +101,10 @@ export function validateRedirectUri(uri: string, allowedHosts?: string[]): boole
  * Hash client secret for secure storage
  * Uses SHA-256 with salt
  */
-export function hashClientSecret(secret: string, salt?: string): { hash: string; salt: string } {
+export function hashClientSecret(
+  secret: string,
+  salt?: string,
+): { hash: string; salt: string } {
   const saltToUse = salt || randomBytes(16).toString("hex");
   const hash = createHash("sha256")
     .update(secret + saltToUse)
@@ -106,7 +115,11 @@ export function hashClientSecret(secret: string, salt?: string): { hash: string;
 /**
  * Verify client secret against stored hash
  */
-export function verifyClientSecret(secret: string, storedHash: string, salt: string): boolean {
+export function verifyClientSecret(
+  secret: string,
+  storedHash: string,
+  salt: string,
+): boolean {
   const { hash } = hashClientSecret(secret, salt);
   return hash === storedHash;
 }
@@ -183,7 +196,8 @@ export function urlencodedParsingMiddleware(
  * In production, use Redis or similar for distributed rate limiting
  */
 class RateLimiter {
-  private attempts: Map<string, { count: number; resetTime: number }> = new Map();
+  private attempts: Map<string, { count: number; resetTime: number }> =
+    new Map();
   private maxAttempts: number;
   private windowMs: number;
 
@@ -198,7 +212,10 @@ class RateLimiter {
 
     if (!record || now > record.resetTime) {
       // Reset or create new record
-      this.attempts.set(identifier, { count: 1, resetTime: now + this.windowMs });
+      this.attempts.set(identifier, {
+        count: 1,
+        resetTime: now + this.windowMs,
+      });
       return false;
     }
 
@@ -230,10 +247,13 @@ const authEndpointLimiter = new RateLimiter(20, 15 * 60 * 1000); // 20 attempts 
 const tokenEndpointLimiter = new RateLimiter(10, 15 * 60 * 1000); // 10 attempts per 15 minutes
 
 // Clean up rate limiter entries every 5 minutes
-setInterval(() => {
-  authEndpointLimiter.cleanup();
-  tokenEndpointLimiter.cleanup();
-}, 5 * 60 * 1000);
+setInterval(
+  () => {
+    authEndpointLimiter.cleanup();
+    tokenEndpointLimiter.cleanup();
+  },
+  5 * 60 * 1000,
+);
 
 /**
  * Rate limiting middleware for OAuth authorization endpoint
@@ -244,14 +264,15 @@ export function rateLimitAuth(
   next: express.NextFunction,
 ) {
   const identifier = req.ip || req.connection.remoteAddress || "unknown";
-  
+
   if (authEndpointLimiter.isRateLimited(identifier)) {
     return res.status(429).json({
       error: "too_many_requests",
-      error_description: "Too many authorization attempts. Please try again later.",
+      error_description:
+        "Too many authorization attempts. Please try again later.",
     });
   }
-  
+
   next();
 }
 
@@ -264,14 +285,14 @@ export function rateLimitToken(
   next: express.NextFunction,
 ) {
   const identifier = req.ip || req.connection.remoteAddress || "unknown";
-  
+
   if (tokenEndpointLimiter.isRateLimited(identifier)) {
     return res.status(429).json({
       error: "too_many_requests",
       error_description: "Too many token requests. Please try again later.",
     });
   }
-  
+
   next();
 }
 
@@ -286,28 +307,28 @@ export function securityHeaders(
 ) {
   // Prevent clickjacking
   res.setHeader("X-Frame-Options", "DENY");
-  
+
   // Prevent MIME type sniffing
   res.setHeader("X-Content-Type-Options", "nosniff");
-  
+
   // XSS protection
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  
+
   // Referrer policy
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  
+
   // Content Security Policy for OAuth pages
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';",
   );
-  
+
   // Cache control for sensitive endpoints
   if (req.path.includes("/oauth/")) {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
   }
-  
+
   next();
 }

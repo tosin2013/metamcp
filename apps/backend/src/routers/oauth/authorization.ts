@@ -80,17 +80,19 @@ authorizationRouter.get("/oauth/authorize", rateLimitAuth, async (req, res) => {
     }
 
     // Validate client_id against registered clients
-    let clientData = await oauthRepository.getClient(client_id as string);
-    let finalClientId = client_id as string; // Track which client_id to use
+    const clientData = await oauthRepository.getClient(client_id as string);
+    const finalClientId = client_id as string; // Track which client_id to use
 
     if (!clientData) {
       // Client not found - direct them to use dynamic client registration
       const baseUrl = getBaseUrl(req);
       return res.status(400).json({
         error: "invalid_client",
-        error_description: "Client not registered. Please register your client first.",
+        error_description:
+          "Client not registered. Please register your client first.",
         registration_endpoint: `${baseUrl}/metamcp/oauth/register`,
-        documentation: "Use the registration endpoint to dynamically register your OAuth client before authorization.",
+        documentation:
+          "Use the registration endpoint to dynamically register your OAuth client before authorization.",
       });
     } else {
       // Validate redirect_uri against registered redirect_uris for existing clients
