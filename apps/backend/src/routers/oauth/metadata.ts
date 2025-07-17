@@ -100,6 +100,7 @@ metadataRouter.get(
         authorization_endpoint: `${baseUrl}/oauth/authorize`,
         token_endpoint: `${baseUrl}/oauth/token`,
         registration_endpoint: `${baseUrl}/oauth/register`,
+        userinfo_endpoint: `${baseUrl}/oauth/userinfo`,
 
         // Supported response types (required by RFC 8414)
         response_types_supported: ["code"],
