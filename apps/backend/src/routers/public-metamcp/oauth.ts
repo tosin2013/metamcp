@@ -266,7 +266,7 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
 
     // For MCP clients, we'll redirect to the frontend login page and then back to the client
     const baseUrl = getBaseUrl(req);
-    const authUrl = new URL("/en/login", baseUrl); // Use frontend login page with default locale
+    const authUrl = new URL("/login", baseUrl); // Use frontend login page with default locale
 
     // Store OAuth parameters in session/state for later use
     // For now, we'll encode them in the callbackURL
@@ -575,7 +575,7 @@ Content-Type: application/json
     if (!req.headers.cookie) {
       // Redirect back to login if no authentication
       const baseUrl = getBaseUrl(req);
-      const loginUrl = new URL("/en/login", baseUrl);
+      const loginUrl = new URL("/login", baseUrl);
       loginUrl.searchParams.set("callbackUrl", req.originalUrl);
       return res.redirect(loginUrl.toString());
     }
@@ -598,7 +598,7 @@ Content-Type: application/json
     if (!sessionResponse.ok) {
       // Redirect back to login if session invalid
       const baseUrl = getBaseUrl(req);
-      const loginUrl = new URL("/en/login", baseUrl);
+      const loginUrl = new URL("/login", baseUrl);
       loginUrl.searchParams.set("callbackUrl", req.originalUrl);
       return res.redirect(loginUrl.toString());
     }
@@ -610,7 +610,7 @@ Content-Type: application/json
     if (!sessionData?.user?.id) {
       // Redirect back to login if no user
       const baseUrl = getBaseUrl(req);
-      const loginUrl = new URL("/en/login", baseUrl);
+      const loginUrl = new URL("/login", baseUrl);
       loginUrl.searchParams.set("callbackUrl", req.originalUrl);
       return res.redirect(loginUrl.toString());
     }
