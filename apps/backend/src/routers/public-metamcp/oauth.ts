@@ -1,9 +1,42 @@
 import express from "express";
 
+// OAuth 2.0 Authorization Parameters interface
+interface OAuthParams {
+  client_id: string;
+  redirect_uri: string;
+  scope?: string;
+  state?: string;
+  code_challenge?: string;
+  code_challenge_method?: string;
+}
+
 const oauthMetadataRouter = express.Router();
 
 // Add JSON parsing middleware for POST endpoints
-oauthMetadataRouter.use(express.json());
+oauthMetadataRouter.use(
+  express.json({
+    limit: "10mb",
+    type: "application/json",
+  }),
+);
+
+// Add URL-encoded form parsing for OAuth standard compatibility
+oauthMetadataRouter.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+  }),
+);
+
+// // Debug middleware to log request details
+// oauthMetadataRouter.use((req, res, next) => {
+//   console.log(`OAuth request: ${req.method} ${req.path}`);
+//   console.log("Content-Type:", req.headers["content-type"]);
+//   console.log("Body:", req.body);
+//   console.log("Body type:", typeof req.body);
+//   console.log("Raw body available:", !!req.body);
+//   next();
+// });
 
 /**
  * Helper function to get the correct base URL from request
@@ -237,13 +270,15 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
 
     // Store OAuth parameters in session/state for later use
     // For now, we'll encode them in the callbackURL
-    const oauthParams = {
-      client_id,
-      redirect_uri,
-      scope: scope || "admin",
-      state,
-      code_challenge,
-      code_challenge_method,
+    const oauthParams: OAuthParams = {
+      client_id: client_id as string,
+      redirect_uri: redirect_uri as string,
+      scope: scope ? (scope as string) : "admin",
+      state: state ? (state as string) : undefined,
+      code_challenge: code_challenge ? (code_challenge as string) : undefined,
+      code_challenge_method: code_challenge_method
+        ? (code_challenge_method as string)
+        : undefined,
     };
 
     const encodedParams = Buffer.from(JSON.stringify(oauthParams)).toString(
@@ -286,15 +321,23 @@ const authorizationCodes = new Map<
  */
 oauthMetadataRouter.post("/oauth/token", async (req, res) => {
   try {
+    // Check if body was parsed correctly
+    if (!req.body || typeof req.body !== "object") {
+      console.error("Token endpoint: req.body is undefined or invalid", {
+        body: req.body,
+        bodyType: typeof req.body,
+        contentType: req.headers["content-type"],
+        method: req.method,
+      });
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description:
+          "Request body is missing or malformed. Ensure Content-Type is application/json or application/x-www-form-urlencoded",
+      });
+    }
+
     const { grant_type, code, redirect_uri, client_id, code_verifier } =
       req.body;
-
-    console.log("OAuth token request:", {
-      grant_type,
-      code,
-      redirect_uri,
-      client_id,
-    });
 
     // Validate grant type
     if (grant_type !== "authorization_code") {
@@ -428,8 +471,6 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
       expires_at: Date.now() + expiresIn * 1000,
     });
 
-    console.log("OAuth token issued for user:", codeData.user_id);
-
     res.json({
       access_token: accessToken,
       token_type: "Bearer",
@@ -452,7 +493,7 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
  */
 oauthMetadataRouter.get("/oauth/callback", async (req, res) => {
   try {
-    let oauthParams: any;
+    let oauthParams: OAuthParams;
 
     // Check if we have encoded params (from our internal redirect flow)
     const { params } = req.query;
@@ -491,9 +532,6 @@ oauthMetadataRouter.get("/oauth/callback", async (req, res) => {
         ) {
           // This is likely a development/testing scenario where the client redirect_uri
           // points back to our callback. Instead of redirecting, show a success page.
-          console.log(
-            "OAuth callback - redirect URI points to our callback, showing success page",
-          );
 
           return res.send(`
             <html>
@@ -525,10 +563,6 @@ Content-Type: application/json
         if (state) {
           redirectUrl.searchParams.set("state", state as string);
         }
-        console.log(
-          "OAuth callback - existing code found, redirecting to:",
-          redirectUrl.toString(),
-        );
         return res.redirect(redirectUrl.toString());
       } else {
         return res.status(400).send("Invalid or expired authorization code");
@@ -539,7 +573,6 @@ Content-Type: application/json
 
     // Verify user authentication by checking session cookies
     if (!req.headers.cookie) {
-      console.log("OAuth callback - no cookies found, redirecting to login");
       // Redirect back to login if no authentication
       const baseUrl = getBaseUrl(req);
       const loginUrl = new URL("/en/login", baseUrl);
@@ -563,9 +596,6 @@ Content-Type: application/json
     const sessionResponse = await auth.handler(sessionRequest);
 
     if (!sessionResponse.ok) {
-      console.log(
-        "OAuth callback - session verification failed, redirecting to login",
-      );
       // Redirect back to login if session invalid
       const baseUrl = getBaseUrl(req);
       const loginUrl = new URL("/en/login", baseUrl);
@@ -578,7 +608,6 @@ Content-Type: application/json
     };
 
     if (!sessionData?.user?.id) {
-      console.log("OAuth callback - no valid user found, redirecting to login");
       // Redirect back to login if no user
       const baseUrl = getBaseUrl(req);
       const loginUrl = new URL("/en/login", baseUrl);
@@ -600,11 +629,6 @@ Content-Type: application/json
       expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
     });
 
-    console.log(
-      "OAuth callback - user authenticated, issuing code for user:",
-      sessionData.user.id,
-    );
-
     // Redirect back to the MCP client with authorization code
     const redirectUrl = new URL(redirect_uri);
     redirectUrl.searchParams.set("code", code);
@@ -612,7 +636,6 @@ Content-Type: application/json
       redirectUrl.searchParams.set("state", state);
     }
 
-    console.log("OAuth callback redirect to:", redirectUrl.toString());
     res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error("Error in OAuth callback:", error);
@@ -626,6 +649,14 @@ Content-Type: application/json
  */
 oauthMetadataRouter.post("/oauth/introspect", async (req, res) => {
   try {
+    // Check if body was parsed correctly
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: "Request body is missing or malformed",
+      });
+    }
+
     const { token } = req.body;
 
     if (!token) {
@@ -677,6 +708,14 @@ oauthMetadataRouter.post("/oauth/introspect", async (req, res) => {
  */
 oauthMetadataRouter.post("/oauth/revoke", async (req, res) => {
   try {
+    // Check if body was parsed correctly
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: "Request body is missing or malformed",
+      });
+    }
+
     const { token } = req.body;
 
     if (!token) {
@@ -689,15 +728,7 @@ oauthMetadataRouter.post("/oauth/revoke", async (req, res) => {
     // Revoke the token by removing it from storage
     if (accessTokens.has(token)) {
       accessTokens.delete(token);
-      console.log(
-        "Successfully revoked token:",
-        token.substring(0, 20) + "...",
-      );
     } else {
-      console.log(
-        "Token not found for revocation:",
-        token.substring(0, 20) + "...",
-      );
       // RFC 7009 specifies that the endpoint should return success even if token doesn't exist
     }
 
@@ -752,11 +783,18 @@ const registeredClients = new Map<
  */
 oauthMetadataRouter.post("/oauth/register", async (req, res) => {
   try {
+    // Check if body was parsed correctly
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: "Request body is missing or malformed",
+      });
+    }
+
     const {
       redirect_uris,
       response_types,
       grant_types,
-      application_type,
       client_name,
       client_uri,
       logo_uri,
@@ -768,13 +806,6 @@ oauthMetadataRouter.post("/oauth/register", async (req, res) => {
       software_id,
       software_version,
     } = req.body;
-
-    console.log("OAuth client registration request:", {
-      client_name,
-      redirect_uris,
-      grant_types,
-      response_types,
-    });
 
     // Validate required parameters
     if (
@@ -800,7 +831,7 @@ oauthMetadataRouter.post("/oauth/register", async (req, res) => {
             error_description: `Invalid redirect URI scheme: ${parsedUri.protocol}`,
           });
         }
-      } catch (error) {
+      } catch {
         return res.status(400).json({
           error: "invalid_redirect_uri",
           error_description: `Invalid redirect URI format: ${uri}`,
@@ -890,12 +921,6 @@ oauthMetadataRouter.post("/oauth/register", async (req, res) => {
 
     // Store the client registration
     registeredClients.set(clientId, clientRegistration);
-
-    console.log("OAuth client registered successfully:", {
-      client_id: clientId,
-      client_name: client_name || "Unnamed MCP Client",
-      redirect_uris,
-    });
 
     // Prepare response according to RFC 7591
     const response: any = {
