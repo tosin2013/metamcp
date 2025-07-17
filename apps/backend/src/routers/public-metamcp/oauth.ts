@@ -130,9 +130,6 @@ oauthMetadataRouter.get(
         // Resource name for display purposes
         resource_name: "MetaMCP Protected Resource",
 
-        // Documentation URL for this resource
-        resource_documentation: `${baseUrl}/docs`,
-
         // OAuth 2.0 DPoP support (disabled for now)
         dpop_bound_access_tokens_required: false,
 
