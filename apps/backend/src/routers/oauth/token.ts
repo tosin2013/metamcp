@@ -1,6 +1,7 @@
 import express from "express";
 
 import { oauthRepository } from "../../db/repositories";
+import { generateSecureAccessToken, rateLimitToken } from "./utils";
 
 const tokenRouter = express.Router();
 
@@ -9,7 +10,7 @@ const tokenRouter = express.Router();
  * Handles token exchange requests from MCP clients
  * Implements proper PKCE verification and code validation
  */
-tokenRouter.post("/oauth/token", async (req, res) => {
+tokenRouter.post("/oauth/token", rateLimitToken, async (req, res) => {
   try {
     // Check if body was parsed correctly
     if (!req.body || typeof req.body !== "object") {
@@ -125,35 +126,50 @@ tokenRouter.post("/oauth/token", async (req, res) => {
     }
     // For "none" auth method, no additional validation needed
 
-    // Verify PKCE if code_challenge was provided
-    if (codeData.code_challenge) {
-      if (!code_verifier) {
-        return res.status(400).json({
-          error: "invalid_request",
-          error_description: "PKCE code verifier is required",
-        });
-      }
+    // OAuth 2.1 Security: PKCE is mandatory for all clients
+    if (!codeData.code_challenge) {
+      return res.status(400).json({
+        error: "invalid_grant",
+        error_description:
+          "Authorization code was not issued with PKCE challenge",
+      });
+    }
 
-      // Verify code challenge (assuming S256 method)
-      if (codeData.code_challenge_method === "S256") {
-        const crypto = await import("crypto");
-        const hash = crypto.createHash("sha256").update(code_verifier).digest();
-        const challengeFromVerifier = hash.toString("base64url");
+    if (!code_verifier) {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: "PKCE code verifier is required",
+      });
+    }
 
-        if (challengeFromVerifier !== codeData.code_challenge) {
-          return res.status(400).json({
-            error: "invalid_grant",
-            error_description: "PKCE verification failed",
-          });
-        }
-      }
+    // Verify code challenge
+    const crypto = await import("crypto");
+    let challengeFromVerifier: string;
+
+    if (codeData.code_challenge_method === "S256") {
+      const hash = crypto.createHash("sha256").update(code_verifier).digest();
+      challengeFromVerifier = hash.toString("base64url");
+    } else if (codeData.code_challenge_method === "plain") {
+      challengeFromVerifier = code_verifier;
+    } else {
+      return res.status(400).json({
+        error: "invalid_grant",
+        error_description: "Unsupported code challenge method",
+      });
+    }
+
+    if (challengeFromVerifier !== codeData.code_challenge) {
+      return res.status(400).json({
+        error: "invalid_grant",
+        error_description: "PKCE verification failed",
+      });
     }
 
     // Code is valid, delete it (authorization codes are single-use)
     await oauthRepository.deleteAuthCode(code);
 
     // Generate access token
-    const accessToken = `mcp_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const accessToken = generateSecureAccessToken();
     const expiresIn = 3600; // 1 hour
 
     // Store access token data

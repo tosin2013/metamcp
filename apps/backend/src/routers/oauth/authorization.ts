@@ -2,7 +2,13 @@ import express from "express";
 
 import { auth } from "../../auth";
 import { oauthRepository } from "../../db/repositories";
-import { getBaseUrl, type OAuthParams } from "./utils";
+import {
+  generateSecureAuthCode,
+  getBaseUrl,
+  type OAuthParams,
+  rateLimitAuth,
+  validateRedirectUri,
+} from "./utils";
 
 const authorizationRouter = express.Router();
 
@@ -10,7 +16,7 @@ const authorizationRouter = express.Router();
  * OAuth 2.0 Authorization Endpoint
  * Handles authorization requests from MCP clients
  */
-authorizationRouter.get("/oauth/authorize", async (req, res) => {
+authorizationRouter.get("/oauth/authorize", rateLimitAuth, async (req, res) => {
   try {
     const {
       response_type,
@@ -47,69 +53,45 @@ authorizationRouter.get("/oauth/authorize", async (req, res) => {
       });
     }
 
+    // OAuth 2.1 Security: Enforce PKCE for all clients
+    if (!code_challenge || !code_challenge_method) {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description:
+          "PKCE parameters (code_challenge and code_challenge_method) are required per OAuth 2.1",
+      });
+    }
+
+    // Validate PKCE method (OAuth 2.1 recommends S256)
+    if (code_challenge_method !== "S256" && code_challenge_method !== "plain") {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description:
+          "Unsupported code_challenge_method. Supported: S256, plain",
+      });
+    }
+
+    // OAuth 2.1 Security: Validate redirect URI format
+    if (!validateRedirectUri(redirect_uri as string)) {
+      return res.status(400).json({
+        error: "invalid_request",
+        error_description: "Invalid redirect_uri format or insecure scheme",
+      });
+    }
+
     // Validate client_id against registered clients
     let clientData = await oauthRepository.getClient(client_id as string);
     let finalClientId = client_id as string; // Track which client_id to use
 
     if (!clientData) {
-      // Auto-register MCP clients that haven't been explicitly registered
-      // This allows MCP clients like the inspector to work without manual registration
-
-      // For MCP clients, we'll create a stable client_id based on the redirect_uri
-      // This prevents infinite loops while allowing the same client to reconnect
-      const redirectUrl = new URL(redirect_uri as string);
-      const stableClientId = `mcp_stable_${Buffer.from(`${redirectUrl.host}:${redirectUrl.port}`).toString("hex")}`;
-
-      // Check if we already have a stable client for this redirect_uri
-      clientData = await oauthRepository.getClient(stableClientId);
-
-      if (!clientData) {
-        // Create new stable client registration
-        const autoRegistration = {
-          client_id: stableClientId,
-          client_secret: null, // MCP clients typically use PKCE without client secrets
-          client_name: `Auto-registered MCP Client (${redirectUrl.host}:${redirectUrl.port})`,
-          redirect_uris: [redirect_uri as string],
-          grant_types: ["authorization_code", "refresh_token"],
-          response_types: ["code"],
-          token_endpoint_auth_method: "none", // MCP clients use PKCE
-          scope: "admin",
-          client_uri: null,
-          logo_uri: null,
-          contacts: null,
-          tos_uri: null,
-          policy_uri: null,
-          software_id: null,
-          software_version: null,
-          created_at: new Date(),
-          updated_at: new Date(),
-        };
-
-        await oauthRepository.upsertClient(autoRegistration);
-        clientData = autoRegistration;
-
-        console.log(
-          `Auto-registered stable MCP client ${stableClientId} for ${redirect_uri}`,
-        );
-      } else {
-        // Update redirect_uris if not already included
-        if (!clientData.redirect_uris.includes(redirect_uri as string)) {
-          const updatedRedirectUris = [
-            ...clientData.redirect_uris,
-            redirect_uri as string,
-          ];
-          await oauthRepository.upsertClient({
-            ...clientData,
-            redirect_uris: updatedRedirectUris,
-          });
-          console.log(
-            `Added new redirect_uri ${redirect_uri} to existing client ${stableClientId}`,
-          );
-        }
-      }
-
-      // Use the stable client_id for the rest of the flow
-      finalClientId = stableClientId;
+      // Client not found - direct them to use dynamic client registration
+      const baseUrl = getBaseUrl(req);
+      return res.status(400).json({
+        error: "invalid_client",
+        error_description: "Client not registered. Please register your client first.",
+        registration_endpoint: `${baseUrl}/metamcp/oauth/register`,
+        documentation: "Use the registration endpoint to dynamically register your OAuth client before authorization.",
+      });
     } else {
       // Validate redirect_uri against registered redirect_uris for existing clients
       if (!clientData.redirect_uris.includes(redirect_uri as string)) {
@@ -160,7 +142,7 @@ authorizationRouter.get("/oauth/authorize", async (req, res) => {
 
           if (sessionData?.user?.id) {
             // User is already authenticated, generate authorization code directly
-            const code = `mcp_code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const code = generateSecureAuthCode();
 
             // Store authorization code with associated data
             await oauthRepository.setAuthCode(code, {
@@ -289,7 +271,10 @@ Content-Type: application/json
         }
         return res.redirect(redirectUrl.toString());
       } else {
-        return res.status(400).send("Invalid or expired authorization code");
+        return res.status(400).json({
+          error: "invalid_request",
+          error_description: "Invalid authorization parameters",
+        });
       }
     }
 
@@ -337,7 +322,7 @@ Content-Type: application/json
     }
 
     // User is authenticated, generate authorization code
-    const code = `mcp_code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const code = generateSecureAuthCode();
 
     // Store authorization code with associated data
     await oauthRepository.setAuthCode(code, {

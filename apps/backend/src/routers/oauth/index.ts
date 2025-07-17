@@ -6,7 +6,11 @@ import metadataRouter from "./metadata";
 import registrationRouter from "./registration";
 import tokenRouter from "./token";
 import userinfoRouter from "./userinfo";
-import { jsonParsingMiddleware, urlencodedParsingMiddleware } from "./utils";
+import {
+  jsonParsingMiddleware,
+  securityHeaders,
+  urlencodedParsingMiddleware,
+} from "./utils";
 
 const oauthRouter = express.Router();
 
@@ -24,6 +28,7 @@ setInterval(
 );
 
 // Apply middleware for OAuth-specific routes
+oauthRouter.use(securityHeaders);
 oauthRouter.use(jsonParsingMiddleware);
 oauthRouter.use(urlencodedParsingMiddleware);
 

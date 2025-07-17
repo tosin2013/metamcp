@@ -1,15 +1,21 @@
 import express from "express";
 
 import { oauthRepository } from "../../db/repositories";
+import {
+  generateSecureClientId,
+  generateSecureClientSecret,
+  rateLimitToken,
+  validateRedirectUri,
+} from "./utils";
 
 const registrationRouter = express.Router();
 
 /**
  * OAuth 2.0 Dynamic Client Registration Endpoint
  * Allows clients to dynamically register with the authorization server
- * Implementation follows RFC 7591
+ * Implementation follows RFC 7591 with OAuth 2.1 security enhancements
  */
-registrationRouter.post("/oauth/register", async (req, res) => {
+registrationRouter.post("/oauth/register", rateLimitToken, async (req, res) => {
   try {
     // Check if body was parsed correctly
     if (!req.body || typeof req.body !== "object") {
@@ -48,36 +54,28 @@ registrationRouter.post("/oauth/register", async (req, res) => {
       });
     }
 
-    // Validate redirect URIs
+    // OAuth 2.1 Security: Validate redirect URIs
     for (const uri of redirect_uris) {
-      try {
-        const parsedUri = new URL(uri);
-        // For security, we might want to restrict certain schemes or domains
-        if (!["http:", "https:", "custom:"].includes(parsedUri.protocol)) {
-          return res.status(400).json({
-            error: "invalid_redirect_uri",
-            error_description: `Invalid redirect URI scheme: ${parsedUri.protocol}`,
-          });
-        }
-      } catch {
+      if (!validateRedirectUri(uri)) {
         return res.status(400).json({
           error: "invalid_redirect_uri",
-          error_description: `Invalid redirect URI format: ${uri}`,
+          error_description: `Invalid redirect URI: ${uri}. Must use secure scheme and valid format.`,
         });
       }
     }
 
-    // Set defaults for optional parameters
+    // OAuth 2.1 Security: Set secure defaults for optional parameters
     const clientGrantTypes =
       grant_types && Array.isArray(grant_types)
         ? grant_types
-        : ["authorization_code"];
+        : ["authorization_code"]; // Only authorization_code by default
 
     const clientResponseTypes =
       response_types && Array.isArray(response_types)
         ? response_types
         : ["code"];
 
+    // OAuth 2.1 Security: Default to PKCE (none auth method)
     const clientTokenEndpointAuthMethod = token_endpoint_auth_method || "none";
 
     // Validate grant types and response types consistency
@@ -119,12 +117,13 @@ registrationRouter.post("/oauth/register", async (req, res) => {
     }
 
     // Generate client credentials
-    const clientId = `mcp_client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const clientId = generateSecureClientId();
 
-    // Generate client secret only if auth method requires it
+    // OAuth 2.1 Security: Generate client secret only if auth method requires it
+    // Recommend PKCE (none) for public clients per OAuth 2.1
     let clientSecret: string | null = null;
     if (clientTokenEndpointAuthMethod !== "none") {
-      clientSecret = `mcp_secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
+      clientSecret = generateSecureClientSecret();
     }
 
     // Create client registration
@@ -150,7 +149,8 @@ registrationRouter.post("/oauth/register", async (req, res) => {
     // Store the client registration
     await oauthRepository.upsertClient(clientRegistration);
 
-    // Prepare response according to RFC 7591
+    // Prepare response according to RFC 7591 with OAuth 2.1 guidance
+    const baseUrl = req.protocol + "://" + req.get("host");
     const response: any = {
       client_id: clientId,
       client_name: clientRegistration.client_name,
@@ -159,11 +159,27 @@ registrationRouter.post("/oauth/register", async (req, res) => {
       response_types: clientRegistration.response_types,
       token_endpoint_auth_method: clientRegistration.token_endpoint_auth_method,
       scope: clientRegistration.scope,
+
+      // OAuth 2.1 Security Information
+      oauth_compliance: "OAuth 2.1",
+      pkce_required: true,
+      pkce_methods_supported: ["S256"],
+
+      // Endpoint information for the client
+      authorization_endpoint: `${baseUrl}/metamcp/oauth/authorize`,
+      token_endpoint: `${baseUrl}/metamcp/oauth/token`,
+      userinfo_endpoint: `${baseUrl}/metamcp/oauth/userinfo`,
+      revocation_endpoint: `${baseUrl}/metamcp/oauth/revoke`,
     };
 
     // Include client_secret only if one was generated
     if (clientSecret) {
       response.client_secret = clientSecret;
+      response.security_note =
+        "Store client_secret securely. For public clients, use PKCE instead.";
+    } else {
+      response.security_note =
+        "This client uses PKCE for security. Ensure code_challenge and code_challenge_method are included in authorization requests.";
     }
 
     // Include optional metadata if provided
@@ -181,6 +197,79 @@ registrationRouter.post("/oauth/register", async (req, res) => {
     res.status(500).json({
       error: "server_error",
       error_description: "Internal server error during client registration",
+    });
+  }
+});
+
+/**
+ * OAuth 2.0 Dynamic Client Registration Information Endpoint
+ * Provides guidance on how to register OAuth clients
+ */
+registrationRouter.get("/oauth/register", async (req, res) => {
+  try {
+    const baseUrl = req.protocol + "://" + req.get("host");
+
+    res.json({
+      registration_endpoint: `${baseUrl}/metamcp/oauth/register`,
+      oauth_version: "OAuth 2.1",
+      description: "Dynamic Client Registration for MetaMCP OAuth Server",
+
+      required_parameters: {
+        redirect_uris:
+          "Array of redirect URIs for your application (HTTPS required in production)",
+      },
+
+      optional_parameters: {
+        client_name: "Human-readable name for your application",
+        grant_types: "OAuth grant types (default: ['authorization_code'])",
+        response_types: "OAuth response types (default: ['code'])",
+        token_endpoint_auth_method:
+          "Client authentication method (default: 'none' for PKCE)",
+        scope: "Requested scope (default: 'admin')",
+        client_uri: "Homepage URL for your application",
+        logo_uri: "Logo URL for your application",
+        contacts: "Array of contact email addresses",
+        tos_uri: "Terms of service URL",
+        policy_uri: "Privacy policy URL",
+      },
+
+      security_recommendations: {
+        use_pkce: "Always use PKCE (token_endpoint_auth_method: 'none')",
+        https_only: "Use HTTPS redirect URIs in production",
+        secure_storage:
+          "Store client credentials securely if using client authentication",
+        code_challenge_method: "Use 'S256' for code_challenge_method",
+      },
+
+      example_registration: {
+        method: "POST",
+        url: `${baseUrl}/metamcp/oauth/register`,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: {
+          client_name: "My MCP Application",
+          redirect_uris: ["https://myapp.example.com/oauth/callback"],
+          grant_types: ["authorization_code"],
+          response_types: ["code"],
+          token_endpoint_auth_method: "none",
+          scope: "admin",
+        },
+      },
+
+      next_steps: [
+        "Register your client using POST to this endpoint",
+        "Save the returned client_id",
+        "Use PKCE in your authorization requests",
+        "Include code_challenge and code_challenge_method=S256",
+        "Exchange authorization codes for access tokens",
+      ],
+    });
+  } catch (error) {
+    console.error("Error in OAuth registration info endpoint:", error);
+    res.status(500).json({
+      error: "server_error",
+      error_description: "Internal server error",
     });
   }
 });

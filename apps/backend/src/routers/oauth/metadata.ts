@@ -121,8 +121,12 @@ metadataRouter.get(
         // Token revocation endpoint
         revocation_endpoint: `${baseUrl}/oauth/revoke`,
 
-        // Code challenge methods - PKCE support
-        code_challenge_methods_supported: ["plain", "S256"],
+        // Code challenge methods - PKCE support (OAuth 2.1 compliant)
+        code_challenge_methods_supported: ["S256"],
+
+        // OAuth 2.1 compliance indicators
+        require_pushed_authorization_requests: false,
+        require_request_uri_registration: false,
       };
 
       res.set({
