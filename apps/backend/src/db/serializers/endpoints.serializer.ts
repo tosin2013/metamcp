@@ -13,6 +13,7 @@ export class EndpointsSerializer {
       description: dbEndpoint.description,
       namespace_uuid: dbEndpoint.namespace_uuid,
       enable_api_key_auth: dbEndpoint.enable_api_key_auth,
+      enable_oauth: dbEndpoint.enable_oauth,
       use_query_param_auth: dbEndpoint.use_query_param_auth,
       created_at: dbEndpoint.created_at.toISOString(),
       updated_at: dbEndpoint.updated_at.toISOString(),
@@ -33,6 +34,7 @@ export class EndpointsSerializer {
       description: dbEndpoint.description,
       namespace_uuid: dbEndpoint.namespace_uuid,
       enable_api_key_auth: dbEndpoint.enable_api_key_auth,
+      enable_oauth: dbEndpoint.enable_oauth,
       use_query_param_auth: dbEndpoint.use_query_param_auth,
       created_at: dbEndpoint.created_at.toISOString(),
       updated_at: dbEndpoint.updated_at.toISOString(),
@@ -43,6 +45,7 @@ export class EndpointsSerializer {
         description: dbEndpoint.namespace.description,
         created_at: dbEndpoint.namespace.created_at.toISOString(),
         updated_at: dbEndpoint.namespace.updated_at.toISOString(),
+        user_id: dbEndpoint.namespace.user_id,
       },
     };
   }

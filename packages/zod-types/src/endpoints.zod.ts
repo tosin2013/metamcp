@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { NamespaceSchema, DatabaseNamespaceSchema } from "./namespaces.zod";
+
 // Endpoint schema definitions
 export const createEndpointFormSchema = z.object({
   name: z
@@ -57,13 +59,7 @@ export const EndpointSchema = z.object({
 
 // Extended endpoint schema with namespace details
 export const EndpointWithNamespaceSchema = EndpointSchema.extend({
-  namespace: z.object({
-    uuid: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    created_at: z.string(),
-    updated_at: z.string(),
-  }),
+  namespace: NamespaceSchema,
 });
 
 export const CreateEndpointResponseSchema = z.object({
@@ -174,13 +170,7 @@ export const DatabaseEndpointSchema = z.object({
 
 export const DatabaseEndpointWithNamespaceSchema =
   DatabaseEndpointSchema.extend({
-    namespace: z.object({
-      uuid: z.string(),
-      name: z.string(),
-      description: z.string().nullable(),
-      created_at: z.date(),
-      updated_at: z.date(),
-    }),
+    namespace: DatabaseNamespaceSchema,
   });
 
 export type DatabaseEndpoint = z.infer<typeof DatabaseEndpointSchema>;

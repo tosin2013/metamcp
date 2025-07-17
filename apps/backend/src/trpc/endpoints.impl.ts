@@ -71,6 +71,7 @@ export const endpointsImplementations = {
         description: input.description,
         namespace_uuid: input.namespaceUuid,
         enable_api_key_auth: input.enableApiKeyAuth ?? true,
+        enable_oauth: input.enableOauth ?? false,
         use_query_param_auth: input.useQueryParamAuth ?? false,
         user_id: effectiveUserId,
       });
@@ -326,6 +327,7 @@ export const endpointsImplementations = {
         description: input.description,
         namespace_uuid: input.namespaceUuid,
         enable_api_key_auth: input.enableApiKeyAuth,
+        enable_oauth: input.enableOauth,
         use_query_param_auth: input.useQueryParamAuth,
       });
 
