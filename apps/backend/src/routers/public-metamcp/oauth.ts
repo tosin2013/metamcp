@@ -385,8 +385,8 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
               redirect_uri: oauthParams.redirect_uri,
               scope: oauthParams.scope || "admin",
               user_id: sessionData.user.id,
-              code_challenge: oauthParams.code_challenge,
-              code_challenge_method: oauthParams.code_challenge_method,
+              code_challenge: oauthParams.code_challenge || null,
+              code_challenge_method: oauthParams.code_challenge_method || null,
               expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
             });
 
@@ -581,6 +581,7 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
 
     // Store access token data
     await oauthRepository.setAccessToken(accessToken, {
+      client_id: codeData.client_id,
       user_id: codeData.user_id,
       scope: codeData.scope,
       expires_at: Date.now() + expiresIn * 1000,
@@ -736,8 +737,8 @@ Content-Type: application/json
       redirect_uri,
       scope: oauthParams.scope || "admin",
       user_id: sessionData.user.id,
-      code_challenge: oauthParams.code_challenge,
-      code_challenge_method: oauthParams.code_challenge_method,
+      code_challenge: oauthParams.code_challenge || null,
+      code_challenge_method: oauthParams.code_challenge_method || null,
       expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
     });
 
@@ -973,7 +974,7 @@ oauthMetadataRouter.post("/oauth/register", async (req, res) => {
     const clientId = `mcp_client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Generate client secret only if auth method requires it
-    let clientSecret: string | undefined;
+    let clientSecret: string | null = null;
     if (clientTokenEndpointAuthMethod !== "none") {
       clientSecret = `mcp_secret_${Date.now()}_${Math.random().toString(36).substr(2, 16)}`;
     }
@@ -988,13 +989,13 @@ oauthMetadataRouter.post("/oauth/register", async (req, res) => {
       response_types: clientResponseTypes,
       token_endpoint_auth_method: clientTokenEndpointAuthMethod,
       scope: scope || "admin",
-      client_uri,
-      logo_uri,
-      contacts: contacts && Array.isArray(contacts) ? contacts : undefined,
-      tos_uri,
-      policy_uri,
-      software_id,
-      software_version,
+      client_uri: client_uri || null,
+      logo_uri: logo_uri || null,
+      contacts: contacts && Array.isArray(contacts) ? contacts : null,
+      tos_uri: tos_uri || null,
+      policy_uri: policy_uri || null,
+      software_id: software_id || null,
+      software_version: software_version || null,
       created_at: new Date(),
     };
 

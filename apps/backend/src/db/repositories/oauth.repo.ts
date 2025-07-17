@@ -1,3 +1,11 @@
+import {
+  OAuthAccessToken,
+  OAuthAccessTokenCreateInput,
+  OAuthAuthorizationCode,
+  OAuthAuthorizationCodeCreateInput,
+  OAuthClient,
+  OAuthClientCreateInput,
+} from "@repo/zod-types";
 import { eq, lt } from "drizzle-orm";
 
 import { db } from "../index";
@@ -10,7 +18,7 @@ import {
 export class OAuthRepository {
   // ===== Registered Clients =====
 
-  async getClient(clientId: string) {
+  async getClient(clientId: string): Promise<OAuthClient | null> {
     const result = await db
       .select()
       .from(oauthClientsTable)
@@ -19,7 +27,7 @@ export class OAuthRepository {
     return result[0] || null;
   }
 
-  async upsertClient(clientData: any) {
+  async upsertClient(clientData: OAuthClientCreateInput): Promise<void> {
     await db
       .insert(oauthClientsTable)
       .values(clientData)
@@ -34,7 +42,7 @@ export class OAuthRepository {
 
   // ===== Authorization Codes =====
 
-  async getAuthCode(code: string) {
+  async getAuthCode(code: string): Promise<OAuthAuthorizationCode | null> {
     const result = await db
       .select()
       .from(oauthAuthorizationCodesTable)
@@ -43,7 +51,10 @@ export class OAuthRepository {
     return result[0] || null;
   }
 
-  async setAuthCode(code: string, data: any) {
+  async setAuthCode(
+    code: string,
+    data: OAuthAuthorizationCodeCreateInput,
+  ): Promise<void> {
     await db.insert(oauthAuthorizationCodesTable).values({
       code,
       client_id: data.client_id,
@@ -56,7 +67,7 @@ export class OAuthRepository {
     });
   }
 
-  async deleteAuthCode(code: string) {
+  async deleteAuthCode(code: string): Promise<void> {
     await db
       .delete(oauthAuthorizationCodesTable)
       .where(eq(oauthAuthorizationCodesTable.code, code));
@@ -64,7 +75,7 @@ export class OAuthRepository {
 
   // ===== Access Tokens =====
 
-  async getAccessToken(token: string) {
+  async getAccessToken(token: string): Promise<OAuthAccessToken | null> {
     const result = await db
       .select()
       .from(oauthAccessTokensTable)
@@ -73,7 +84,10 @@ export class OAuthRepository {
     return result[0] || null;
   }
 
-  async setAccessToken(token: string, data: any) {
+  async setAccessToken(
+    token: string,
+    data: OAuthAccessTokenCreateInput,
+  ): Promise<void> {
     await db.insert(oauthAccessTokensTable).values({
       access_token: token,
       client_id: data.client_id,
@@ -83,7 +97,7 @@ export class OAuthRepository {
     });
   }
 
-  async deleteAccessToken(token: string) {
+  async deleteAccessToken(token: string): Promise<void> {
     await db
       .delete(oauthAccessTokensTable)
       .where(eq(oauthAccessTokensTable.access_token, token));
@@ -91,7 +105,7 @@ export class OAuthRepository {
 
   // ===== Cleanup =====
 
-  async cleanupExpired() {
+  async cleanupExpired(): Promise<void> {
     const now = new Date();
     await Promise.all([
       db
