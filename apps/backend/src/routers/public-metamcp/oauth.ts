@@ -1,5 +1,7 @@
 import express from "express";
 
+import { auth } from "../../auth";
+
 // OAuth 2.0 Authorization Parameters interface
 interface OAuthParams {
   client_id: string;
@@ -10,7 +12,22 @@ interface OAuthParams {
   code_challenge_method?: string;
 }
 
+import { oauthRepository } from "../../db/repositories";
+
 const oauthMetadataRouter = express.Router();
+
+// Cleanup expired entries every 5 minutes
+setInterval(
+  async () => {
+    try {
+      await oauthRepository.cleanupExpired();
+      console.log("Cleaned up expired OAuth codes and tokens");
+    } catch (error) {
+      console.error("Error cleaning up expired OAuth entries:", error);
+    }
+  },
+  5 * 60 * 1000,
+);
 
 // Add JSON parsing middleware for POST endpoints
 oauthMetadataRouter.use(
@@ -248,30 +265,81 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
     }
 
     // Validate client_id against registered clients
-    const clientData = registeredClients.get(client_id as string);
+    let clientData = await oauthRepository.getClient(client_id as string);
+    let finalClientId = client_id as string; // Track which client_id to use
+
     if (!clientData) {
-      return res.status(400).json({
-        error: "invalid_client",
-        error_description: "Client not found or not registered",
-      });
+      // Auto-register MCP clients that haven't been explicitly registered
+      // This allows MCP clients like the inspector to work without manual registration
+
+      // For MCP clients, we'll create a stable client_id based on the redirect_uri
+      // This prevents infinite loops while allowing the same client to reconnect
+      const redirectUrl = new URL(redirect_uri as string);
+      const stableClientId = `mcp_stable_${Buffer.from(`${redirectUrl.host}:${redirectUrl.port}`).toString("hex")}`;
+
+      // Check if we already have a stable client for this redirect_uri
+      clientData = await oauthRepository.getClient(stableClientId);
+
+      if (!clientData) {
+        // Create new stable client registration
+        const autoRegistration = {
+          client_id: stableClientId,
+          client_secret: null, // MCP clients typically use PKCE without client secrets
+          client_name: `Auto-registered MCP Client (${redirectUrl.host}:${redirectUrl.port})`,
+          redirect_uris: [redirect_uri as string],
+          grant_types: ["authorization_code", "refresh_token"],
+          response_types: ["code"],
+          token_endpoint_auth_method: "none", // MCP clients use PKCE
+          scope: "admin",
+          client_uri: null,
+          logo_uri: null,
+          contacts: null,
+          tos_uri: null,
+          policy_uri: null,
+          software_id: null,
+          software_version: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        await oauthRepository.upsertClient(autoRegistration);
+        clientData = autoRegistration;
+
+        console.log(
+          `Auto-registered stable MCP client ${stableClientId} for ${redirect_uri}`,
+        );
+      } else {
+        // Update redirect_uris if not already included
+        if (!clientData.redirect_uris.includes(redirect_uri as string)) {
+          const updatedRedirectUris = [
+            ...clientData.redirect_uris,
+            redirect_uri as string,
+          ];
+          await oauthRepository.upsertClient({
+            ...clientData,
+            redirect_uris: updatedRedirectUris,
+          });
+          console.log(
+            `Added new redirect_uri ${redirect_uri} to existing client ${stableClientId}`,
+          );
+        }
+      }
+
+      // Use the stable client_id for the rest of the flow
+      finalClientId = stableClientId;
+    } else {
+      // Validate redirect_uri against registered redirect_uris for existing clients
+      if (!clientData.redirect_uris.includes(redirect_uri as string)) {
+        return res.status(400).json({
+          error: "invalid_request",
+          error_description: "redirect_uri is not registered for this client",
+        });
+      }
     }
 
-    // Validate redirect_uri against registered redirect_uris
-    if (!clientData.redirect_uris.includes(redirect_uri as string)) {
-      return res.status(400).json({
-        error: "invalid_request",
-        error_description: "redirect_uri is not registered for this client",
-      });
-    }
-
-    // For MCP clients, we'll redirect to the frontend login page and then back to the client
-    const baseUrl = getBaseUrl(req);
-    const authUrl = new URL("/login", baseUrl); // Use frontend login page with default locale
-
-    // Store OAuth parameters in session/state for later use
-    // For now, we'll encode them in the callbackURL
+    // Store OAuth parameters for later use (using the correct client_id)
     const oauthParams: OAuthParams = {
-      client_id: client_id as string,
+      client_id: finalClientId,
       redirect_uri: redirect_uri as string,
       scope: scope ? (scope as string) : "admin",
       state: state ? (state as string) : undefined,
@@ -281,6 +349,65 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
         : undefined,
     };
 
+    console.log(
+      `Using client_id: ${finalClientId} (original: ${client_id}) for redirect_uri: ${redirect_uri}`,
+    );
+
+    const baseUrl = getBaseUrl(req);
+
+    // Check if user is already authenticated by verifying better-auth session
+    if (req.headers.cookie) {
+      try {
+        // Verify the session using better-auth
+        const sessionUrl = new URL("/api/auth/get-session", baseUrl);
+        const headers = new Headers();
+        headers.set("cookie", req.headers.cookie);
+
+        const sessionRequest = new Request(sessionUrl.toString(), {
+          method: "GET",
+          headers,
+        });
+
+        const sessionResponse = await auth.handler(sessionRequest);
+
+        if (sessionResponse.ok) {
+          const sessionData = (await sessionResponse.json()) as {
+            user?: { id: string };
+          };
+
+          if (sessionData?.user?.id) {
+            // User is already authenticated, generate authorization code directly
+            const code = `mcp_code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // Store authorization code with associated data
+            await oauthRepository.setAuthCode(code, {
+              client_id: oauthParams.client_id,
+              redirect_uri: oauthParams.redirect_uri,
+              scope: oauthParams.scope || "admin",
+              user_id: sessionData.user.id,
+              code_challenge: oauthParams.code_challenge,
+              code_challenge_method: oauthParams.code_challenge_method,
+              expires_at: Date.now() + 10 * 60 * 1000, // 10 minutes
+            });
+
+            // Redirect back to the MCP client with authorization code
+            const redirectUrl = new URL(oauthParams.redirect_uri);
+            redirectUrl.searchParams.set("code", code);
+            if (oauthParams.state) {
+              redirectUrl.searchParams.set("state", oauthParams.state);
+            }
+
+            return res.redirect(redirectUrl.toString());
+          }
+        }
+      } catch (error) {
+        console.log("Session verification failed, proceeding to login:", error);
+        // Continue to login flow if session verification fails
+      }
+    }
+
+    // User is not authenticated, redirect to login page
+    const authUrl = new URL("/login", baseUrl);
     const encodedParams = Buffer.from(JSON.stringify(oauthParams)).toString(
       "base64url",
     );
@@ -299,20 +426,6 @@ oauthMetadataRouter.get("/oauth/authorize", async (req, res) => {
     });
   }
 });
-
-// Store for authorization codes (in production, use a database or Redis)
-const authorizationCodes = new Map<
-  string,
-  {
-    client_id: string;
-    redirect_uri: string;
-    scope: string;
-    user_id: string;
-    code_challenge?: string;
-    code_challenge_method?: string;
-    expires_at: number;
-  }
->();
 
 /**
  * OAuth 2.0 Token Endpoint
@@ -356,7 +469,7 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
     }
 
     // Look up the authorization code
-    const codeData = authorizationCodes.get(code);
+    const codeData = await oauthRepository.getAuthCode(code);
     if (!codeData) {
       return res.status(400).json({
         error: "invalid_grant",
@@ -365,8 +478,8 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
     }
 
     // Check if code has expired (10 minutes)
-    if (Date.now() > codeData.expires_at) {
-      authorizationCodes.delete(code);
+    if (Date.now() > codeData.expires_at.getTime()) {
+      await oauthRepository.deleteAuthCode(code);
       return res.status(400).json({
         error: "invalid_grant",
         error_description: "Authorization code has expired",
@@ -389,7 +502,9 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
     }
 
     // Validate client_id against registered clients
-    const clientData = registeredClients.get(client_id);
+    // Note: Client should have been registered either explicitly via /oauth/register
+    // or auto-registered during the /oauth/authorize flow
+    const clientData = await oauthRepository.getClient(client_id);
     if (!clientData) {
       return res.status(400).json({
         error: "invalid_client",
@@ -458,14 +573,14 @@ oauthMetadataRouter.post("/oauth/token", async (req, res) => {
     }
 
     // Code is valid, delete it (authorization codes are single-use)
-    authorizationCodes.delete(code);
+    await oauthRepository.deleteAuthCode(code);
 
     // Generate access token
     const accessToken = `mcp_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresIn = 3600; // 1 hour
 
     // Store access token data
-    accessTokens.set(accessToken, {
+    await oauthRepository.setAccessToken(accessToken, {
       user_id: codeData.user_id,
       scope: codeData.scope,
       expires_at: Date.now() + expiresIn * 1000,
@@ -513,11 +628,11 @@ oauthMetadataRouter.get("/oauth/callback", async (req, res) => {
       }
 
       // If we receive a code directly, look up the code data to get the original parameters
-      const codeData = authorizationCodes.get(code as string);
+      const codeData = await oauthRepository.getAuthCode(code as string);
       if (codeData) {
         // Check if code has expired
-        if (Date.now() > codeData.expires_at) {
-          authorizationCodes.delete(code as string);
+        if (Date.now() > codeData.expires_at.getTime()) {
+          await oauthRepository.deleteAuthCode(code as string);
           return res.status(400).send("Authorization code has expired");
         }
 
@@ -580,9 +695,6 @@ Content-Type: application/json
       return res.redirect(loginUrl.toString());
     }
 
-    // Import auth here to avoid circular dependency issues
-    const { auth } = await import("../../auth");
-
     // Verify the session using better-auth
     const sessionUrl = new URL("/api/auth/get-session", getBaseUrl(req));
     const headers = new Headers();
@@ -619,7 +731,7 @@ Content-Type: application/json
     const code = `mcp_code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Store authorization code with associated data
-    authorizationCodes.set(code, {
+    await oauthRepository.setAuthCode(code, {
       client_id,
       redirect_uri,
       scope: oauthParams.scope || "admin",
@@ -667,7 +779,7 @@ oauthMetadataRouter.post("/oauth/introspect", async (req, res) => {
     }
 
     // Check if token exists and is valid
-    const tokenData = accessTokens.get(token);
+    const tokenData = await oauthRepository.getAccessToken(token);
 
     if (!tokenData || !token.startsWith("mcp_token_")) {
       return res.json({
@@ -676,8 +788,8 @@ oauthMetadataRouter.post("/oauth/introspect", async (req, res) => {
     }
 
     // Check if token has expired
-    if (Date.now() > tokenData.expires_at) {
-      accessTokens.delete(token);
+    if (Date.now() > tokenData.expires_at.getTime()) {
+      await oauthRepository.deleteAccessToken(token);
       return res.json({
         active: false,
       });
@@ -689,8 +801,8 @@ oauthMetadataRouter.post("/oauth/introspect", async (req, res) => {
       scope: tokenData.scope,
       client_id: "mcp_client", // In production, store and return actual client_id
       token_type: "Bearer",
-      exp: Math.floor(tokenData.expires_at / 1000),
-      iat: Math.floor((tokenData.expires_at - 3600 * 1000) / 1000), // Issued 1 hour before expiry
+      exp: Math.floor(tokenData.expires_at.getTime() / 1000),
+      iat: Math.floor((tokenData.expires_at.getTime() - 3600 * 1000) / 1000), // Issued 1 hour before expiry
       sub: tokenData.user_id,
     });
   } catch (error) {
@@ -726,8 +838,8 @@ oauthMetadataRouter.post("/oauth/revoke", async (req, res) => {
     }
 
     // Revoke the token by removing it from storage
-    if (accessTokens.has(token)) {
-      accessTokens.delete(token);
+    if (await oauthRepository.getAccessToken(token)) {
+      await oauthRepository.deleteAccessToken(token);
     } else {
       // RFC 7009 specifies that the endpoint should return success even if token doesn't exist
     }
@@ -742,39 +854,6 @@ oauthMetadataRouter.post("/oauth/revoke", async (req, res) => {
     });
   }
 });
-
-// Store for access tokens (in production, use a database or Redis)
-const accessTokens = new Map<
-  string,
-  {
-    user_id: string;
-    scope: string;
-    expires_at: number;
-  }
->();
-
-// Store for registered OAuth clients (in production, use a database)
-const registeredClients = new Map<
-  string,
-  {
-    client_id: string;
-    client_secret?: string;
-    client_name?: string;
-    redirect_uris: string[];
-    grant_types: string[];
-    response_types: string[];
-    token_endpoint_auth_method: string;
-    scope?: string;
-    client_uri?: string;
-    logo_uri?: string;
-    contacts?: string[];
-    tos_uri?: string;
-    policy_uri?: string;
-    software_id?: string;
-    software_version?: string;
-    created_at: number;
-  }
->();
 
 /**
  * OAuth 2.0 Dynamic Client Registration Endpoint
@@ -916,11 +995,11 @@ oauthMetadataRouter.post("/oauth/register", async (req, res) => {
       policy_uri,
       software_id,
       software_version,
-      created_at: Date.now(),
+      created_at: new Date(),
     };
 
     // Store the client registration
-    registeredClients.set(clientId, clientRegistration);
+    await oauthRepository.upsertClient(clientRegistration);
 
     // Prepare response according to RFC 7591
     const response: any = {
@@ -983,7 +1062,7 @@ oauthMetadataRouter.get("/oauth/userinfo", async (req, res) => {
     }
 
     // Look up token data (in production, this should validate signature and lookup in database)
-    const tokenData = accessTokens.get(token);
+    const tokenData = await oauthRepository.getAccessToken(token);
     if (!tokenData) {
       return res.status(401).json({
         error: "invalid_token",
@@ -992,8 +1071,8 @@ oauthMetadataRouter.get("/oauth/userinfo", async (req, res) => {
     }
 
     // Check if token has expired
-    if (Date.now() > tokenData.expires_at) {
-      accessTokens.delete(token);
+    if (Date.now() > tokenData.expires_at.getTime()) {
+      await oauthRepository.deleteAccessToken(token);
       return res.status(401).json({
         error: "invalid_token",
         error_description: "Access token has expired",

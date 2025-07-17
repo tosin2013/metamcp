@@ -364,3 +364,90 @@ export const configTable = pgTable("config", {
     .notNull()
     .defaultNow(),
 });
+
+// OAuth Registered Clients table
+export const oauthClientsTable = pgTable("oauth_clients", {
+  client_id: text("client_id").primaryKey(),
+  client_secret: text("client_secret"),
+  client_name: text("client_name").notNull(),
+  redirect_uris: text("redirect_uris")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  grant_types: text("grant_types")
+    .array()
+    .notNull()
+    .default(sql`'{"authorization_code","refresh_token"}'::text[]`),
+  response_types: text("response_types")
+    .array()
+    .notNull()
+    .default(sql`'{"code"}'::text[]`),
+  token_endpoint_auth_method: text("token_endpoint_auth_method")
+    .notNull()
+    .default("none"),
+  scope: text("scope").default("admin"),
+  client_uri: text("client_uri"),
+  logo_uri: text("logo_uri"),
+  contacts: text("contacts").array(),
+  tos_uri: text("tos_uri"),
+  policy_uri: text("policy_uri"),
+  software_id: text("software_id"),
+  software_version: text("software_version"),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// OAuth Authorization Codes table
+export const oauthAuthorizationCodesTable = pgTable(
+  "oauth_authorization_codes",
+  {
+    code: text("code").primaryKey(),
+    client_id: text("client_id")
+      .notNull()
+      .references(() => oauthClientsTable.client_id, { onDelete: "cascade" }),
+    redirect_uri: text("redirect_uri").notNull(),
+    scope: text("scope").notNull().default("admin"),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    code_challenge: text("code_challenge"),
+    code_challenge_method: text("code_challenge_method"),
+    expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("oauth_authorization_codes_client_id_idx").on(table.client_id),
+    index("oauth_authorization_codes_user_id_idx").on(table.user_id),
+    index("oauth_authorization_codes_expires_at_idx").on(table.expires_at),
+  ],
+);
+
+// OAuth Access Tokens table
+export const oauthAccessTokensTable = pgTable(
+  "oauth_access_tokens",
+  {
+    access_token: text("access_token").primaryKey(),
+    client_id: text("client_id")
+      .notNull()
+      .references(() => oauthClientsTable.client_id, { onDelete: "cascade" }),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull().default("admin"),
+    expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("oauth_access_tokens_client_id_idx").on(table.client_id),
+    index("oauth_access_tokens_user_id_idx").on(table.user_id),
+    index("oauth_access_tokens_expires_at_idx").on(table.expires_at),
+  ],
+);
