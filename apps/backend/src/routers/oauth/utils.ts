@@ -243,16 +243,16 @@ class RateLimiter {
 }
 
 // Create rate limiter instances
-const authEndpointLimiter = new RateLimiter(20, 15 * 60 * 1000); // 20 attempts per 15 minutes
-const tokenEndpointLimiter = new RateLimiter(10, 15 * 60 * 1000); // 10 attempts per 15 minutes
+const authEndpointLimiter = new RateLimiter(20, 1 * 60 * 1000); // 20 attempts per 1 minute
+const tokenEndpointLimiter = new RateLimiter(10, 1 * 60 * 1000); // 10 attempts per 1 minute
 
-// Clean up rate limiter entries every 5 minutes
+// Clean up rate limiter entries every 10 minutes
 setInterval(
   () => {
     authEndpointLimiter.cleanup();
     tokenEndpointLimiter.cleanup();
   },
-  5 * 60 * 1000,
+  10 * 60 * 1000,
 );
 
 /**
