@@ -109,11 +109,56 @@ async function validateOAuthToken(
 }
 
 /**
- * Enhanced authentication middleware with API Key and OAuth fallback
- * Follows MCP OAuth specification with proper WWW-Authenticate headers
- * - First attempts API key authentication
- * - Falls back to OAuth bearer token validation
- * - Returns proper WWW-Authenticate headers per RFC 9728
+ * Extract authentication token from request headers and query parameters
+ */
+function extractAuthToken(
+  req: express.Request,
+  endpoint: DatabaseEndpoint,
+): {
+  token?: string;
+  source: "x-api-key" | "authorization" | "query" | "none";
+  isOAuthLikeToken: boolean;
+} {
+  // Check for API key in X-API-Key header
+  const apiKeyHeader = req.headers["x-api-key"] as string;
+  if (apiKeyHeader) {
+    return {
+      token: apiKeyHeader,
+      source: "x-api-key",
+      isOAuthLikeToken: false,
+    };
+  }
+
+  // Check Authorization header (Bearer token)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    return {
+      token,
+      source: "authorization",
+      isOAuthLikeToken: token.startsWith("mcp_token_"),
+    };
+  }
+
+  // Check query parameters for API key (if enabled)
+  if (endpoint.enable_api_key_auth && endpoint.use_query_param_auth) {
+    const queryApiKey =
+      (req.query.api_key as string) || (req.query.apikey as string);
+    if (queryApiKey) {
+      return {
+        token: queryApiKey,
+        source: "query",
+        isOAuthLikeToken: false,
+      };
+    }
+  }
+
+  return { source: "none", isOAuthLikeToken: false };
+}
+
+/**
+ * Enhanced authentication middleware organized by 4 clear conditions
+ * to prevent infinite retry issues with MCP inspector
  */
 export const authenticateApiKey = async (
   req: express.Request,
@@ -123,79 +168,32 @@ export const authenticateApiKey = async (
   const authReq = req as ApiKeyAuthenticatedRequest;
   const endpoint = authReq.endpoint;
 
-  // Skip authentication if neither method is enabled for this endpoint
+  // Extract token information
+  const { token, source, isOAuthLikeToken } = extractAuthToken(req, endpoint);
+
+  // ===== CONDITION 1: Both API key and OAuth OFF =====
   if (!endpoint?.enable_api_key_auth && !endpoint?.enable_oauth) {
-    return next();
+    return next(); // Pass through without authentication
   }
 
   try {
-    let authToken: string | undefined;
-    let isApiKey = false;
-    let isOAuthToken = false;
-
-    // Check for API key first (X-API-Key header)
-    const apiKeyHeader = req.headers["x-api-key"] as string;
-    if (apiKeyHeader) {
-      authToken = apiKeyHeader;
-      isApiKey = true;
-    }
-
-    // Check Authorization header (could be API key or OAuth token)
-    if (!authToken) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        authToken = authHeader.substring(7);
-        // Determine if this looks like an OAuth token or API key
-        // MCP OAuth tokens start with "mcp_token_" or are session tokens
-        // API keys typically don't start with these prefixes
-        if (authToken.startsWith("mcp_token_")) {
-          isOAuthToken = true;
-        } else {
-          // For backward compatibility, try as API key first, then OAuth
-          // But prioritize OAuth if OAuth is enabled and API key is disabled
-          if (endpoint.enable_oauth && !endpoint.enable_api_key_auth) {
-            isOAuthToken = true;
-          }
-        }
+    // ===== CONDITION 2: API key ON, OAuth OFF =====
+    if (endpoint.enable_api_key_auth && !endpoint.enable_oauth) {
+      if (!token) {
+        // No token provided - request API key
+        return sendApiKeyRequiredResponse(res);
       }
-    }
 
-    // Check query parameters for API key (if enabled)
-    if (
-      !authToken &&
-      endpoint.enable_api_key_auth &&
-      endpoint.use_query_param_auth
-    ) {
-      const queryApiKey =
-        (req.query.api_key as string) || (req.query.apikey as string);
-      if (queryApiKey) {
-        authToken = queryApiKey;
-        isApiKey = true;
-      }
-    }
+      // Validate API key
+      const apiKeyResult = await apiKeysRepository.validateApiKey(token);
 
-    if (!authToken) {
-      return sendAuthenticationChallenge(req, res, endpoint);
-    }
-
-    // Try API key authentication first (only if enabled and token looks like API key)
-    let authResult: {
-      valid: boolean;
-      user_id?: string | null;
-      key_uuid?: string;
-    } | null = null;
-
-    if (endpoint.enable_api_key_auth && (isApiKey || !isOAuthToken)) {
-      authResult = await apiKeysRepository.validateApiKey(authToken);
-
-      if (authResult?.valid) {
-        // API key authentication successful
-        authReq.apiKeyUserId = authResult.user_id || undefined;
-        authReq.apiKeyUuid = authResult.key_uuid;
+      if (apiKeyResult?.valid) {
+        // API key valid - perform access control and pass
+        authReq.apiKeyUserId = apiKeyResult.user_id || undefined;
+        authReq.apiKeyUuid = apiKeyResult.key_uuid;
         authReq.authMethod = "api_key";
 
-        // Perform API key access control checks
-        const accessCheckResult = checkApiKeyAccess(authResult, endpoint);
+        const accessCheckResult = checkApiKeyAccess(apiKeyResult, endpoint);
         if (!accessCheckResult.allowed) {
           return res.status(403).json({
             error: "Access denied",
@@ -205,19 +203,89 @@ export const authenticateApiKey = async (
         }
 
         return next();
+      } else {
+        // API key invalid - return 401 without OAuth challenge to prevent inspector retries
+        return res.status(401).json({
+          error: "invalid_api_key",
+          error_description: "The provided API key is invalid or expired",
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 
-    // If API key failed or not attempted, try OAuth token validation if OAuth is enabled
-    if (endpoint.enable_oauth && (!authResult?.valid || isOAuthToken)) {
-      const oauthResult = await validateOAuthToken(authToken, req);
+    // ===== CONDITION 3: API key ON, OAuth ON =====
+    if (endpoint.enable_api_key_auth && endpoint.enable_oauth) {
+      if (!token) {
+        // No token provided - allow OAuth flow
+        return sendOAuthChallengeResponse(req, res, endpoint);
+      }
+
+      // If token looks like OAuth token or came from Authorization header, try OAuth first
+      if (isOAuthLikeToken || source === "authorization") {
+        const oauthResult = await validateOAuthToken(token, req);
+
+        if (oauthResult.valid) {
+          // OAuth token valid - perform access control and pass
+          authReq.oauthUserId = oauthResult.user_id;
+          authReq.authMethod = "oauth";
+
+          const accessCheckResult = checkOAuthAccess(oauthResult);
+          if (!accessCheckResult.allowed) {
+            return res.status(403).json({
+              error: "insufficient_scope",
+              error_description: accessCheckResult.message,
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          return next();
+        }
+      }
+
+      // Try API key validation
+      const apiKeyResult = await apiKeysRepository.validateApiKey(token);
+
+      if (apiKeyResult?.valid) {
+        // API key valid - perform access control and pass
+        authReq.apiKeyUserId = apiKeyResult.user_id || undefined;
+        authReq.apiKeyUuid = apiKeyResult.key_uuid;
+        authReq.authMethod = "api_key";
+
+        const accessCheckResult = checkApiKeyAccess(apiKeyResult, endpoint);
+        if (!accessCheckResult.allowed) {
+          return res.status(403).json({
+            error: "Access denied",
+            message: accessCheckResult.message,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        return next();
+      } else {
+        // Both OAuth and API key failed - return 401 with rate limiting
+        return res.status(429).json({
+          error: "invalid_credentials",
+          error_description: "Authentication failed. Too many attempts.",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // ===== CONDITION 4: API key OFF, OAuth ON =====
+    if (!endpoint.enable_api_key_auth && endpoint.enable_oauth) {
+      if (!token) {
+        // No token provided - allow OAuth flow
+        return sendOAuthChallengeResponse(req, res, endpoint);
+      }
+
+      // Validate OAuth token
+      const oauthResult = await validateOAuthToken(token, req);
 
       if (oauthResult.valid) {
-        // OAuth authentication successful
+        // OAuth token valid - perform access control and pass
         authReq.oauthUserId = oauthResult.user_id;
         authReq.authMethod = "oauth";
 
-        // Perform OAuth access control checks
         const accessCheckResult = checkOAuthAccess(oauthResult);
         if (!accessCheckResult.allowed) {
           return res.status(403).json({
@@ -228,35 +296,23 @@ export const authenticateApiKey = async (
         }
 
         return next();
+      } else {
+        // OAuth token invalid - return 401 with rate limiting to prevent retries
+        return res.status(429).json({
+          error: "invalid_token",
+          error_description:
+            "The provided OAuth token is invalid. Too many attempts.",
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 
-    // Authentication failed for the provided token
-    // Determine the most appropriate error response based on what was attempted
-    if (isApiKey && endpoint.enable_api_key_auth && !endpoint.enable_oauth) {
-      // API key was provided but failed, and OAuth is not enabled
-      return res.status(401).json({
-        error: "invalid_api_key",
-        error_description: "The provided API key is invalid or expired",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (
-      isOAuthToken &&
-      endpoint.enable_oauth &&
-      !endpoint.enable_api_key_auth
-    ) {
-      // OAuth token was provided but failed, and API key auth is not enabled
-      return res.status(401).json({
-        error: "invalid_token",
-        error_description: "The provided OAuth token is invalid or expired",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // If both methods are enabled or token type is ambiguous, send challenge
-    return sendAuthenticationChallenge(req, res, endpoint);
+    // Fallback - should not reach here with the conditions above
+    return res.status(500).json({
+      error: "Internal server error",
+      message: "Invalid authentication configuration",
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("Error in authentication middleware:", error);
     return res.status(500).json({
@@ -320,70 +376,57 @@ function checkOAuthAccess(oauthResult: {
 }
 
 /**
- * Send WWW-Authenticate challenge following MCP OAuth specification
- * CRITICAL: Only set Bearer WWW-Authenticate header when OAuth is enabled
- * to prevent MCP inspector from triggering unwanted OAuth flows
+ * Send API key required response (no WWW-Authenticate header to prevent OAuth flow)
  */
-function sendAuthenticationChallenge(
+function sendApiKeyRequiredResponse(res: express.Response): express.Response {
+  return res.status(401).json({
+    error: "authentication_required",
+    error_description: "Authentication required via API key",
+    supported_methods: [
+      "X-API-Key header",
+      "query parameter (api_key or apikey)",
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Send OAuth challenge response with proper WWW-Authenticate header
+ */
+function sendOAuthChallengeResponse(
   req: express.Request,
   res: express.Response,
   endpoint: DatabaseEndpoint,
 ): express.Response {
   const baseUrl = getBaseUrl(req);
 
-  // Determine which authentication methods are available
-  const authMethods = [];
+  // Set WWW-Authenticate header for OAuth flow
+  const bearerChallenge = [
+    `Bearer realm="MetaMCP"`,
+    `scope="admin"`,
+    `resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+  ].join(", ");
 
-  // Set appropriate WWW-Authenticate header based on enabled methods
-  if (endpoint.enable_oauth) {
-    authMethods.push("Authorization header (Bearer token)");
+  res.set("WWW-Authenticate", bearerChallenge);
 
-    // ONLY set WWW-Authenticate header with Bearer challenge when OAuth is enabled
-    // This prevents MCP inspector from triggering OAuth flow when OAuth is disabled
-    const bearerChallenge = [
-      `Bearer realm="MetaMCP"`,
-      `scope="admin"`,
-      `resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
-    ].join(", ");
+  const authMethods = ["Authorization header (Bearer token)"];
 
-    res.set("WWW-Authenticate", bearerChallenge);
-  } else if (endpoint.enable_api_key_auth) {
-    // When only API key auth is enabled, don't set WWW-Authenticate header
-    // to avoid triggering OAuth flow in MCP inspector
+  // Add API key methods if also enabled
+  if (endpoint.enable_api_key_auth) {
     authMethods.push("X-API-Key header");
-
-    // Add query parameter auth method if enabled
     if (endpoint.use_query_param_auth) {
       authMethods.push("query parameter (api_key or apikey)");
     }
   }
 
-  // Add API key methods when both OAuth and API key are enabled
-  if (endpoint.enable_oauth && endpoint.enable_api_key_auth) {
-    authMethods.push("X-API-Key header");
-
-    // Add query parameter auth method if enabled
-    if (endpoint.use_query_param_auth) {
-      authMethods.push("query parameter (api_key or apikey)");
-    }
-  }
-
-  let errorDescription: string;
-  if (endpoint.enable_oauth && endpoint.enable_api_key_auth) {
-    errorDescription =
-      "Authentication required via OAuth bearer token or API key";
-  } else if (endpoint.enable_oauth) {
-    errorDescription = "Authentication required via OAuth bearer token";
-  } else {
-    errorDescription = "Authentication required via API key";
-  }
+  const errorDescription = endpoint.enable_api_key_auth
+    ? "Authentication required via OAuth bearer token or API key"
+    : "Authentication required via OAuth bearer token";
 
   return res.status(401).json({
     error: "authentication_required",
     error_description: errorDescription,
-    resource_metadata: endpoint.enable_oauth
-      ? `${baseUrl}/.well-known/oauth-protected-resource`
-      : undefined,
+    resource_metadata: `${baseUrl}/.well-known/oauth-protected-resource`,
     supported_methods: authMethods,
     timestamp: new Date().toISOString(),
   });
