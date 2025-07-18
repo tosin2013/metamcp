@@ -8,7 +8,7 @@ import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 import {
   ApiKeyAuthenticatedRequest,
   authenticateApiKey,
-} from "../../middleware/api-key-auth.middleware";
+} from "../../middleware/api-key-oauth.middleware";
 
 const streamableHttpRouter = express.Router();
 

@@ -15,7 +15,7 @@ import { sanitizeName } from "../../lib/metamcp/utils";
 import {
   ApiKeyAuthenticatedRequest,
   authenticateApiKey,
-} from "../../middleware/api-key-auth.middleware";
+} from "../../middleware/api-key-oauth.middleware";
 
 const openApiRouter = express.Router();
 
