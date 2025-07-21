@@ -229,10 +229,10 @@ export const authenticateApiKey = async (
           authReq.oauthUserId = oauthResult.user_id;
           authReq.authMethod = "oauth";
 
-          const accessCheckResult = checkOAuthAccess(oauthResult);
+          const accessCheckResult = checkOAuthAccess(oauthResult, endpoint);
           if (!accessCheckResult.allowed) {
             return res.status(403).json({
-              error: "insufficient_scope",
+              error: "access_denied",
               error_description: accessCheckResult.message,
               timestamp: new Date().toISOString(),
             });
@@ -286,10 +286,10 @@ export const authenticateApiKey = async (
         authReq.oauthUserId = oauthResult.user_id;
         authReq.authMethod = "oauth";
 
-        const accessCheckResult = checkOAuthAccess(oauthResult);
+        const accessCheckResult = checkOAuthAccess(oauthResult, endpoint);
         if (!accessCheckResult.allowed) {
           return res.status(403).json({
-            error: "insufficient_scope",
+            error: "access_denied",
             error_description: accessCheckResult.message,
             timestamp: new Date().toISOString(),
           });
@@ -356,22 +356,38 @@ function checkApiKeyAccess(
 }
 
 /**
- * Check if OAuth token has required scopes for the endpoint
+ * Check if OAuth token user has access to the endpoint
  */
-function checkOAuthAccess(oauthResult: {
-  user_id?: string;
-  scopes?: string[];
-}): { allowed: boolean; message?: string } {
-  const scopes = oauthResult.scopes || [];
+function checkOAuthAccess(
+  oauthResult: { user_id?: string; scopes?: string[] },
+  endpoint: DatabaseEndpoint,
+): { allowed: boolean; message?: string } {
+  // If no user_id in token, deny access
+  if (!oauthResult.user_id) {
+    return {
+      allowed: false,
+      message: "OAuth token missing user information",
+    };
+  }
 
-  // Check for admin access - with admin scope, user can access any endpoint
-  if (scopes.includes("admin")) {
+  // Check endpoint access based on user permissions:
+  // 1. Public endpoints (user_id is null) - accessible to all authenticated users
+  // 2. Private endpoints (user_id is not null) - only accessible to the owner
+
+  if (endpoint.user_id === null) {
+    // Public endpoint - any authenticated user can access
     return { allowed: true };
   }
 
+  if (endpoint.user_id === oauthResult.user_id) {
+    // Private endpoint owned by the user - allowed
+    return { allowed: true };
+  }
+
+  // Private endpoint owned by someone else - denied
   return {
     allowed: false,
-    message: "Insufficient scope. Required: admin",
+    message: `Access denied. This is a private endpoint owned by another user. You can only access public endpoints or endpoints you own.`,
   };
 }
 
