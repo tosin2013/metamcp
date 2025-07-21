@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
+  "scripts": {
+    "lint": "echo 'ESLint config package - no linting needed'",
+    "lint:fix": "echo 'ESLint config package - no linting needed'"
+  },
   "exports": {
     "./base": "./base.js",
     "./next-js": "./next.js",

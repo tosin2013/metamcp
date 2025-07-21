@@ -1,0 +1,83 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "MetaMCP",
+  "logo": {
+    "light": "/favicon.png",
+    "dark": "/favicon.png"
+  },
+  "favicon": {
+    "light": "/favicon.png",
+    "dark": "/favicon.png"
+  },
+  "icons":{
+    "library": "lucide"
+  },
+  "colors": {
+    "primary": "#3b82f6",
+    "light": "#3b82f6",
+    "dark": "#3b82f6"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/metatool-ai/metamcp",
+        "icon": "github"
+      },
+      {
+        "label": "Discord",
+        "href": "https://discord.gg/mNsyat7mFX",
+        "icon": "discord"
+      }
+    ]
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "index",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "concepts/mcp-servers",
+          "concepts/namespaces",
+          "concepts/endpoints",
+          "concepts/middleware",
+          "concepts/inspector"
+        ]
+      },
+      {
+        "group": "Deployment",
+        "pages": [
+          "deployment/custom-deployment"
+        ]
+      },
+      {
+        "group": "Integrations",
+        "pages": [
+          "integrations/cursor",
+          "integrations/claude-desktop"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": [
+          "development/contributing",
+          "development/i18n",
+          "development/architecture"
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/metatool-ai/metamcp",
+      "discord": "https://discord.gg/mNsyat7mFX"
+    }
+  }
+}

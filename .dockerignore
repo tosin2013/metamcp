@@ -179,3 +179,5 @@ coverage/
 .env.local
 .env.development
 .env.test
+
+docs/

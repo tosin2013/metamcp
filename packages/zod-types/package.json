@@ -17,6 +17,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
