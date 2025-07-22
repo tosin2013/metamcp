@@ -1,11 +1,12 @@
 import { ListToolsRequest } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
 
-import { metaMcpServerPool } from "../../../lib/metamcp/metamcp-server-pool";
 import {
   ApiKeyAuthenticatedRequest,
   authenticateApiKey,
-} from "../../../middleware/api-key-auth.middleware";
+} from "@/middleware/api-key-oauth.middleware";
+
+import { metaMcpServerPool } from "../../../lib/metamcp/metamcp-server-pool";
 import { lookupEndpoint } from "../../../middleware/lookup-endpoint-middleware";
 import { createMiddlewareEnabledHandlers } from "./handlers";
 import { generateOpenApiSchema } from "./schema-generator";

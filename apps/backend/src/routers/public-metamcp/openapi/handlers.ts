@@ -22,7 +22,6 @@ import { sanitizeName } from "../../../lib/metamcp/utils";
 
 // Original List Tools Handler (adapted from metamcp-proxy.ts)
 export const createOriginalListToolsHandler = (
-  sessionId: string,
   includeInactiveServers: boolean = false,
 ): ListToolsHandler => {
   return async (request, context) => {
@@ -167,7 +166,7 @@ export const createMiddlewareEnabledHandlers = (
   };
 
   // Create original handlers
-  const originalListToolsHandler = createOriginalListToolsHandler(sessionId);
+  const originalListToolsHandler = createOriginalListToolsHandler();
   const originalCallToolHandler = createOriginalCallToolHandler();
 
   // Compose middleware with handlers
