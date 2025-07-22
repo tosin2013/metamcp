@@ -61,7 +61,8 @@
         "group": "Integrations",
         "pages": [
           "integrations/cursor",
-          "integrations/claude-desktop"
+          "integrations/claude-desktop",
+          "integrations/open-web-ui"
         ]
       },
       {

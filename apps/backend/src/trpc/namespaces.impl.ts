@@ -386,6 +386,22 @@ export const namespacesImplementations = {
           // Don't fail the entire update operation if idle server invalidation fails
         });
 
+      // Also invalidate OpenAPI sessions for this namespace
+      metaMcpServerPool
+        .invalidateOpenApiSessions([input.uuid])
+        .then(() => {
+          console.log(
+            `Invalidated OpenAPI session for updated namespace ${input.uuid}`,
+          );
+        })
+        .catch((error) => {
+          console.error(
+            `Error invalidating OpenAPI session for namespace ${input.uuid}:`,
+            error,
+          );
+          // Don't fail the entire update operation if OpenAPI session invalidation fails
+        });
+
       return {
         success: true as const,
         data: NamespacesSerializer.serializeNamespace(result),
@@ -456,6 +472,22 @@ export const namespacesImplementations = {
             error,
           );
           // Don't fail the entire operation if idle server invalidation fails
+        });
+
+      // Also invalidate OpenAPI sessions for this namespace
+      metaMcpServerPool
+        .invalidateOpenApiSessions([input.namespaceUuid])
+        .then(() => {
+          console.log(
+            `Invalidated OpenAPI session for namespace ${input.namespaceUuid} after server status update`,
+          );
+        })
+        .catch((error) => {
+          console.error(
+            `Error invalidating OpenAPI session for namespace ${input.namespaceUuid}:`,
+            error,
+          );
+          // Don't fail the entire operation if OpenAPI session invalidation fails
         });
 
       return {
@@ -737,6 +769,22 @@ export const namespacesImplementations = {
             error,
           );
           // Don't fail the entire operation if idle server invalidation fails
+        });
+
+      // Also invalidate OpenAPI sessions for this namespace
+      metaMcpServerPool
+        .invalidateOpenApiSessions([input.namespaceUuid])
+        .then(() => {
+          console.log(
+            `Invalidated OpenAPI session for namespace ${input.namespaceUuid} after tools refresh`,
+          );
+        })
+        .catch((error) => {
+          console.error(
+            `Error invalidating OpenAPI session for namespace ${input.namespaceUuid}:`,
+            error,
+          );
+          // Don't fail the entire operation if OpenAPI session invalidation fails
         });
 
       return {

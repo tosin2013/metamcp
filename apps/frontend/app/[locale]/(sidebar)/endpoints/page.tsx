@@ -78,9 +78,10 @@ export default function EndpointsPage() {
         });
         setSelectedNamespaceUuid("");
         setSelectedNamespaceName("");
-        // Invalidate and refetch the endpoint list and MCP servers list
+        // Invalidate and refetch the endpoint list, MCP servers list, and API keys list
         utils.frontend.endpoints.list.invalidate();
         utils.frontend.mcpServers.list.invalidate();
+        utils.apiKeys.list.invalidate();
       } else {
         // Handle business logic failures
         console.error("Endpoint creation failed:", data.message);

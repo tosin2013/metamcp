@@ -290,6 +290,21 @@ export const mcpServersImplementations = {
               error,
             );
           });
+
+        // Also invalidate OpenAPI sessions for affected namespaces
+        metaMcpServerPool
+          .invalidateOpenApiSessions(affectedNamespaceUuids)
+          .then(() => {
+            console.log(
+              `Invalidated OpenAPI sessions for ${affectedNamespaceUuids.length} namespaces after deleting server: ${deletedServer.name} (${deletedServer.uuid})`,
+            );
+          })
+          .catch((error) => {
+            console.error(
+              `Error invalidating OpenAPI sessions after deleting server ${deletedServer.uuid}:`,
+              error,
+            );
+          });
       }
 
       return {
@@ -380,6 +395,21 @@ export const mcpServersImplementations = {
           .catch((error) => {
             console.error(
               `Error invalidating idle MetaMCP servers after updating server ${updatedServer.uuid}:`,
+              error,
+            );
+          });
+
+        // Also invalidate OpenAPI sessions for affected namespaces
+        metaMcpServerPool
+          .invalidateOpenApiSessions(affectedNamespaceUuids)
+          .then(() => {
+            console.log(
+              `Invalidated OpenAPI sessions for ${affectedNamespaceUuids.length} namespaces after updating server: ${updatedServer.name} (${updatedServer.uuid})`,
+            );
+          })
+          .catch((error) => {
+            console.error(
+              `Error invalidating OpenAPI sessions after updating server ${updatedServer.uuid}:`,
               error,
             );
           });

@@ -418,6 +418,103 @@ export class MetaMcpServerPool {
       await this.createIdleServer(namespaceUuid, includeInactiveServers);
     }
   }
+
+  /**
+   * Get or create a persistent MetaMCP server for OpenAPI endpoints
+   * These sessions are never cleaned up automatically and persist until invalidation
+   */
+  async getOpenApiServer(
+    namespaceUuid: string,
+    includeInactiveServers: boolean = false,
+  ): Promise<MetaMcpServerInstance | undefined> {
+    // Use a deterministic session ID for OpenAPI endpoints
+    const sessionId = `openapi_${namespaceUuid}`;
+
+    // Check if we already have an active server for this OpenAPI session
+    if (this.activeServers[sessionId]) {
+      return this.activeServers[sessionId];
+    }
+
+    // Check if we have an idle server for this namespace that we can convert
+    const idleServer = this.idleServers[namespaceUuid];
+    if (idleServer) {
+      // Convert idle server to active OpenAPI server
+      delete this.idleServers[namespaceUuid];
+      this.activeServers[sessionId] = idleServer;
+      this.sessionToNamespace[sessionId] = namespaceUuid;
+
+      console.log(
+        `Converted idle MetaMCP server to OpenAPI server for namespace ${namespaceUuid}, session ${sessionId}`,
+      );
+
+      // Create a new idle server to replace the one we just used (ASYNC - NON-BLOCKING)
+      this.createIdleServerAsync(namespaceUuid, includeInactiveServers);
+
+      return idleServer;
+    }
+
+    // No idle server available, create a new one
+    const newServer = await this.createNewServer(
+      sessionId,
+      namespaceUuid,
+      includeInactiveServers,
+    );
+    if (!newServer) {
+      return undefined;
+    }
+
+    this.activeServers[sessionId] = newServer;
+    this.sessionToNamespace[sessionId] = namespaceUuid;
+
+    console.log(
+      `Created new OpenAPI MetaMCP server for namespace ${namespaceUuid}, session ${sessionId}`,
+    );
+
+    // Also create an idle server for future use (ASYNC - NON-BLOCKING)
+    this.createIdleServerAsync(namespaceUuid, includeInactiveServers);
+
+    return newServer;
+  }
+
+  /**
+   * Invalidate OpenAPI sessions for specific namespaces
+   * This is called when namespace configurations change
+   */
+  async invalidateOpenApiSessions(
+    namespaceUuids: string[],
+    includeInactiveServers: boolean = false,
+  ): Promise<void> {
+    console.log(
+      `Invalidating OpenAPI sessions for namespaces: ${namespaceUuids.join(", ")}`,
+    );
+
+    const promises = namespaceUuids.map(async (namespaceUuid) => {
+      const sessionId = `openapi_${namespaceUuid}`;
+
+      // Clean up existing OpenAPI session if it exists
+      const existingServer = this.activeServers[sessionId];
+      if (existingServer) {
+        try {
+          await existingServer.cleanup();
+          console.log(
+            `Cleaned up existing OpenAPI session for namespace ${namespaceUuid}`,
+          );
+        } catch (error) {
+          console.error(
+            `Error cleaning up OpenAPI session for namespace ${namespaceUuid}:`,
+            error,
+          );
+        }
+        delete this.activeServers[sessionId];
+        delete this.sessionToNamespace[sessionId];
+      }
+
+      // Create a new OpenAPI session with updated configuration
+      await this.getOpenApiServer(namespaceUuid, includeInactiveServers);
+    });
+
+    await Promise.allSettled(promises);
+  }
 }
 
 // Create a singleton instance

@@ -2,12 +2,13 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express from "express";
 
-import { endpointsRepository } from "../../db/repositories/endpoints.repo";
-import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 import {
   ApiKeyAuthenticatedRequest,
   authenticateApiKey,
-} from "../../middleware/api-key-oauth.middleware";
+} from "@/middleware/api-key-oauth.middleware";
+import { lookupEndpoint } from "@/middleware/lookup-endpoint-middleware";
+
+import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 
 const sseRouter = express.Router();
 
@@ -26,39 +27,6 @@ const cleanupSession = async (sessionId: string) => {
 
   // Clean up MetaMCP server pool session
   await metaMcpServerPool.cleanupSession(sessionId);
-};
-
-// Middleware to lookup endpoint by name and add namespace info to request
-const lookupEndpoint = async (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-) => {
-  const endpointName = req.params.endpoint_name;
-
-  try {
-    const endpoint = await endpointsRepository.findByName(endpointName);
-    if (!endpoint) {
-      return res.status(404).json({
-        error: "Endpoint not found",
-        message: `No endpoint found with name: ${endpointName}`,
-      });
-    }
-
-    // Add the endpoint info to the request for use in handlers
-    const authReq = req as ApiKeyAuthenticatedRequest;
-    authReq.namespaceUuid = endpoint.namespace_uuid;
-    authReq.endpointName = endpointName;
-    authReq.endpoint = endpoint;
-
-    next();
-  } catch (error) {
-    console.error("Error looking up endpoint:", error);
-    return res.status(500).json({
-      error: "Internal server error",
-      message: "Failed to lookup endpoint",
-    });
-  }
 };
 
 sseRouter.get(
