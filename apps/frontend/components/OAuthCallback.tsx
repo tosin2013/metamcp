@@ -76,12 +76,12 @@ const OAuthCallback = () => {
         sessionStorage.removeItem(`${storagePrefix}code_verifier`);
         sessionStorage.removeItem(SESSION_KEYS.SERVER_URL);
         sessionStorage.removeItem(SESSION_KEYS.MCP_SERVER_UUID);
-
+        
         // Redirect back to the MCP server detail page
-        window.location.href = `/mcp-servers/${mcpServerUuid}`;
+        // window.location.href = `/mcp-servers/${mcpServerUuid}`;
       } catch (error) {
         console.error("OAuth callback error:", error);
-        window.location.href = "/mcp-servers";
+        // window.location.href = "/mcp-servers";
       }
     };
 

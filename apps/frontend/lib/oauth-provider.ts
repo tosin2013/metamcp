@@ -20,7 +20,7 @@ class DbOAuthClientProvider implements OAuthClientProvider {
   }
 
   get redirectUrl() {
-    return getAppUrl() + "/oauth/callback";
+    return getAppUrl() + "/fe-oauth/callback";
   }
 
   get clientMetadata() {

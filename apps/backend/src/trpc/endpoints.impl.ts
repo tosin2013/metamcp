@@ -85,26 +85,31 @@ export const endpointsImplementations = {
           const baseUrl = process.env.APP_URL;
           const endpointUrl = `${baseUrl}/metamcp/${input.name}/mcp`;
 
-          // Get or create API key for bearer token
+          // Get or create API key for bearer token only if API key auth is enabled
           let bearerToken = "";
-          try {
-            const userApiKeys = await apiKeysRepository.findByUserId(userId);
-            const activeApiKey = userApiKeys.find((key) => key.is_active);
+          if (input.enableApiKeyAuth) {
+            try {
+              const userApiKeys = await apiKeysRepository.findByUserId(userId);
+              const activeApiKey = userApiKeys.find((key) => key.is_active);
 
-            if (activeApiKey) {
-              bearerToken = activeApiKey.key;
-            } else {
-              // Create a new API key if none exists
-              const newApiKey = await apiKeysRepository.create({
-                name: "Auto-generated for MCP Server",
-                user_id: userId,
-                is_active: true,
-              });
-              bearerToken = newApiKey.key;
+              if (activeApiKey) {
+                bearerToken = activeApiKey.key;
+              } else {
+                // Create a new API key if none exists
+                const newApiKey = await apiKeysRepository.create({
+                  name: "Auto-generated for MCP Server",
+                  user_id: userId,
+                  is_active: true,
+                });
+                bearerToken = newApiKey.key;
+              }
+            } catch (apiKeyError) {
+              console.error(
+                "Error getting API key for MCP server:",
+                apiKeyError,
+              );
+              // Continue without bearer token if API key operation fails
             }
-          } catch (apiKeyError) {
-            console.error("Error getting API key for MCP server:", apiKeyError);
-            // Continue without bearer token if API key operation fails
           }
 
           await mcpServersRepository.create({
