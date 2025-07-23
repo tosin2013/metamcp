@@ -1,3 +1,4 @@
+import cors from "cors";
 import express from "express";
 
 import { oauthRepository } from "../../db/repositories";
@@ -25,6 +26,16 @@ setInterval(
     }
   },
   5 * 60 * 1000,
+);
+
+// Enable CORS for all OAuth endpoints with wildcard origin
+oauthRouter.use(
+  cors({
+    origin: "*", // Allow all origins for OAuth endpoints
+    credentials: true,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  }),
 );
 
 // Apply middleware for OAuth-specific routes
