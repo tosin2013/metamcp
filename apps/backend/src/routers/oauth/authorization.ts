@@ -90,7 +90,7 @@ authorizationRouter.get("/oauth/authorize", rateLimitAuth, async (req, res) => {
         error: "invalid_client",
         error_description:
           "Client not registered. Please register your client first.",
-        registration_endpoint: `${baseUrl}/metamcp/oauth/register`,
+        registration_endpoint: `${baseUrl}/oauth/register`,
         documentation:
           "Use the registration endpoint to dynamically register your OAuth client before authorization.",
       });
@@ -180,7 +180,7 @@ authorizationRouter.get("/oauth/authorize", rateLimitAuth, async (req, res) => {
     );
     authUrl.searchParams.set(
       "callbackUrl",
-      `/metamcp/oauth/callback?params=${encodedParams}`,
+      `/oauth/callback?params=${encodedParams}`,
     );
 
     // Redirect to frontend login page
@@ -232,7 +232,7 @@ authorizationRouter.get("/oauth/callback", async (req, res) => {
         // Check if the redirect_uri points back to our own callback endpoint
         // This would create an infinite loop, so we need to handle it differently
         const baseUrl = getBaseUrl(req);
-        const ourCallbackUrl = `${baseUrl}/metamcp/oauth/callback`;
+        const ourCallbackUrl = `${baseUrl}/oauth/callback`;
 
         if (
           codeData.redirect_uri === ourCallbackUrl ||
@@ -250,7 +250,7 @@ authorizationRouter.get("/oauth/callback", async (req, res) => {
                 <p>State: <code>${state || "none"}</code></p>
                 <p>You can now exchange this code for an access token using the token endpoint.</p>
                 <pre>
-POST ${baseUrl}/metamcp/oauth/token
+POST ${baseUrl}/oauth/token
 Content-Type: application/json
 
 {

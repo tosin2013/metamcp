@@ -61,7 +61,7 @@ async function validateOAuthToken(
       // This allows us to check against the stored token data
       try {
         const baseUrl = getBaseUrl(req);
-        const introspectUrl = new URL("/metamcp/oauth/introspect", baseUrl);
+        const introspectUrl = new URL("/oauth/introspect", baseUrl);
 
         const introspectRequest = new Request(introspectUrl.toString(), {
           method: "POST",

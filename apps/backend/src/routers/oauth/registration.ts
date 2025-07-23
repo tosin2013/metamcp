@@ -166,10 +166,10 @@ registrationRouter.post("/oauth/register", rateLimitToken, async (req, res) => {
       pkce_methods_supported: ["S256"],
 
       // Endpoint information for the client
-      authorization_endpoint: `${baseUrl}/metamcp/oauth/authorize`,
-      token_endpoint: `${baseUrl}/metamcp/oauth/token`,
-      userinfo_endpoint: `${baseUrl}/metamcp/oauth/userinfo`,
-      revocation_endpoint: `${baseUrl}/metamcp/oauth/revoke`,
+      authorization_endpoint: `${baseUrl}/oauth/authorize`,
+      token_endpoint: `${baseUrl}/oauth/token`,
+      userinfo_endpoint: `${baseUrl}/oauth/userinfo`,
+      revocation_endpoint: `${baseUrl}/oauth/revoke`,
     };
 
     // Include client_secret only if one was generated
@@ -210,7 +210,7 @@ registrationRouter.get("/oauth/register", async (req, res) => {
     const baseUrl = req.protocol + "://" + req.get("host");
 
     res.json({
-      registration_endpoint: `${baseUrl}/metamcp/oauth/register`,
+      registration_endpoint: `${baseUrl}/oauth/register`,
       oauth_version: "OAuth 2.1",
       description: "Dynamic Client Registration for MetaMCP OAuth Server",
 
@@ -243,7 +243,7 @@ registrationRouter.get("/oauth/register", async (req, res) => {
 
       example_registration: {
         method: "POST",
-        url: `${baseUrl}/metamcp/oauth/register`,
+        url: `${baseUrl}/oauth/register`,
         headers: {
           "Content-Type": "application/json",
         },
