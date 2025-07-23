@@ -30,7 +30,7 @@ const OAuthCallback = () => {
 
       if (!code || !serverUrl || !mcpServerUuid) {
         console.error("Missing required OAuth parameters");
-        // window.location.href = "/mcp-servers";
+        window.location.href = "/mcp-servers";
         return;
       }
 
@@ -83,10 +83,10 @@ const OAuthCallback = () => {
         sessionStorage.removeItem(SESSION_KEYS.MCP_SERVER_UUID);
 
         // Redirect back to the MCP server detail page
-        // window.location.href = `/mcp-servers/${mcpServerUuid}`;
+        window.location.href = `/mcp-servers/${mcpServerUuid}`;
       } catch (error) {
         console.error("OAuth callback error:", error);
-        // window.location.href = "/mcp-servers";
+        window.location.href = "/mcp-servers";
       }
     };
 
