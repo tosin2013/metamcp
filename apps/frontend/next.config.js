@@ -18,7 +18,7 @@ const nextConfig = {
       // Well-known endpoints - proxy all well-known paths
       {
         source: "/.well-known/:path*",
-        destination: `${backendUrl}/metamcp/.well-known/:path*`,
+        destination: `${backendUrl}/.well-known/:path*`,
       },
       // Auth API endpoints
       {
