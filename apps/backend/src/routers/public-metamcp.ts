@@ -2,7 +2,6 @@ import cors from "cors";
 import express from "express";
 
 import { endpointsRepository } from "../db/repositories/endpoints.repo";
-import oauthRouter from "./oauth";
 import { openApiRouter } from "./public-metamcp/openapi";
 import sseRouter from "./public-metamcp/sse";
 import streamableHttpRouter from "./public-metamcp/streamable-http";
@@ -32,9 +31,6 @@ publicEndpointsRouter.use((req, res, next) => {
   }
   next();
 });
-
-// OAuth metadata discovery endpoints (must be mounted first for .well-known paths)
-publicEndpointsRouter.use(oauthRouter);
 
 // Use StreamableHTTP router for /mcp routes
 publicEndpointsRouter.use(streamableHttpRouter);

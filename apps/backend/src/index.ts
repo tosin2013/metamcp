@@ -3,6 +3,7 @@ import express from "express";
 import { auth } from "./auth";
 import { initializeIdleServers } from "./lib/startup";
 import mcpProxyRouter from "./routers/mcp-proxy";
+import oauthRouter from "./routers/oauth";
 import publicEndpointsRouter from "./routers/public-metamcp";
 import trpcRouter from "./routers/trpc";
 
@@ -17,6 +18,9 @@ app.use((req, res, next) => {
     express.json()(req, res, next);
   }
 });
+
+// Mount OAuth metadata endpoints at root level for .well-known discovery
+app.use(oauthRouter);
 
 // Mount better-auth routes by calling auth API directly
 app.use(async (req, res, next) => {

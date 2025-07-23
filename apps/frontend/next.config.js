@@ -13,7 +13,7 @@ const nextConfig = {
       // OAuth endpoints - proxy all oauth paths
       {
         source: "/oauth/:path*",
-        destination: `${backendUrl}/metamcp/oauth/:path*`,
+        destination: `${backendUrl}/oauth/:path*`,
       },
       // Well-known endpoints - proxy all well-known paths
       {
