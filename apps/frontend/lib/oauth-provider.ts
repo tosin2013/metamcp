@@ -2,28 +2,33 @@ import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import {
   OAuthClientInformation,
   OAuthClientInformationSchema,
+  OAuthClientMetadata,
+  OAuthMetadata,
   OAuthTokens,
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 
+import { getServerSpecificKey, SESSION_KEYS } from "./constants";
 import { getAppUrl } from "./env";
 import { vanillaTrpcClient } from "./trpc";
 
 // OAuth client provider that works with a specific MCP server
 class DbOAuthClientProvider implements OAuthClientProvider {
   private mcpServerUuid: string;
-  private storagePrefix: string;
+  protected serverUrl: string;
 
-  constructor(mcpServerUuid: string) {
+  constructor(mcpServerUuid: string, serverUrl: string) {
     this.mcpServerUuid = mcpServerUuid;
-    this.storagePrefix = `oauth_${this.mcpServerUuid}_`;
+    this.serverUrl = serverUrl;
+    // Save the server URL to session storage for consistency
+    sessionStorage.setItem(SESSION_KEYS.SERVER_URL, serverUrl);
   }
 
   get redirectUrl() {
     return getAppUrl() + "/fe-oauth/callback";
   }
 
-  get clientMetadata() {
+  get clientMetadata(): OAuthClientMetadata {
     return {
       redirect_uris: [this.redirectUrl],
       token_endpoint_auth_method: "none",
@@ -66,9 +71,11 @@ class DbOAuthClientProvider implements OAuthClientProvider {
         }
       } else {
         // Get from session storage during OAuth flow
-        const storedInfo = sessionStorage.getItem(
-          `${this.storagePrefix}client_information`,
+        const key = getServerSpecificKey(
+          SESSION_KEYS.CLIENT_INFORMATION,
+          this.serverUrl,
         );
+        const storedInfo = sessionStorage.getItem(key);
         if (storedInfo) {
           return await OAuthClientInformationSchema.parseAsync(
             JSON.parse(storedInfo),
@@ -85,10 +92,11 @@ class DbOAuthClientProvider implements OAuthClientProvider {
 
   async saveClientInformation(clientInformation: OAuthClientInformation) {
     // Save to session storage during OAuth flow
-    sessionStorage.setItem(
-      `${this.storagePrefix}client_information`,
-      JSON.stringify(clientInformation),
+    const key = getServerSpecificKey(
+      SESSION_KEYS.CLIENT_INFORMATION,
+      this.serverUrl,
     );
+    sessionStorage.setItem(key, JSON.stringify(clientInformation));
 
     // If server exists, also save to database
     if (await this.serverExists()) {
@@ -118,9 +126,8 @@ class DbOAuthClientProvider implements OAuthClientProvider {
         }
       } else {
         // Get from session storage during OAuth flow
-        const storedTokens = sessionStorage.getItem(
-          `${this.storagePrefix}tokens`,
-        );
+        const key = getServerSpecificKey(SESSION_KEYS.TOKENS, this.serverUrl);
+        const storedTokens = sessionStorage.getItem(key);
         if (storedTokens) {
           return await OAuthTokensSchema.parseAsync(JSON.parse(storedTokens));
         }
@@ -135,10 +142,8 @@ class DbOAuthClientProvider implements OAuthClientProvider {
 
   async saveTokens(tokens: OAuthTokens) {
     // Save to session storage during OAuth flow
-    sessionStorage.setItem(
-      `${this.storagePrefix}tokens`,
-      JSON.stringify(tokens),
-    );
+    const key = getServerSpecificKey(SESSION_KEYS.TOKENS, this.serverUrl);
+    sessionStorage.setItem(key, JSON.stringify(tokens));
 
     // If server exists, also save to database
     if (await this.serverExists()) {
@@ -159,7 +164,11 @@ class DbOAuthClientProvider implements OAuthClientProvider {
 
   async saveCodeVerifier(codeVerifier: string) {
     // Save to session storage during OAuth flow
-    sessionStorage.setItem(`${this.storagePrefix}code_verifier`, codeVerifier);
+    const key = getServerSpecificKey(
+      SESSION_KEYS.CODE_VERIFIER,
+      this.serverUrl,
+    );
+    sessionStorage.setItem(key, codeVerifier);
 
     // If server exists, also save to database
     if (await this.serverExists()) {
@@ -193,9 +202,11 @@ class DbOAuthClientProvider implements OAuthClientProvider {
     }
 
     // Get from session storage during OAuth flow
-    const codeVerifier = sessionStorage.getItem(
-      `${this.storagePrefix}code_verifier`,
+    const key = getServerSpecificKey(
+      SESSION_KEYS.CODE_VERIFIER,
+      this.serverUrl,
     );
+    const codeVerifier = sessionStorage.getItem(key);
     if (!codeVerifier) {
       throw new Error("No code verifier saved for session");
     }
@@ -204,15 +215,64 @@ class DbOAuthClientProvider implements OAuthClientProvider {
   }
 
   clear() {
-    sessionStorage.removeItem(`${this.storagePrefix}client_information`);
-    sessionStorage.removeItem(`${this.storagePrefix}tokens`);
-    sessionStorage.removeItem(`${this.storagePrefix}code_verifier`);
+    sessionStorage.removeItem(
+      getServerSpecificKey(SESSION_KEYS.CLIENT_INFORMATION, this.serverUrl),
+    );
+    sessionStorage.removeItem(
+      getServerSpecificKey(SESSION_KEYS.TOKENS, this.serverUrl),
+    );
+    sessionStorage.removeItem(
+      getServerSpecificKey(SESSION_KEYS.CODE_VERIFIER, this.serverUrl),
+    );
+  }
+}
+
+// Debug version that overrides redirect URL and allows saving server OAuth metadata
+export class DebugDbOAuthClientProvider extends DbOAuthClientProvider {
+  get redirectUrl(): string {
+    return getAppUrl() + "/fe-oauth/callback/debug";
+  }
+
+  saveServerMetadata(metadata: OAuthMetadata) {
+    const key = getServerSpecificKey(
+      SESSION_KEYS.SERVER_METADATA,
+      this.serverUrl,
+    );
+    sessionStorage.setItem(key, JSON.stringify(metadata));
+  }
+
+  getServerMetadata(): OAuthMetadata | null {
+    const key = getServerSpecificKey(
+      SESSION_KEYS.SERVER_METADATA,
+      this.serverUrl,
+    );
+    const metadata = sessionStorage.getItem(key);
+    if (!metadata) {
+      return null;
+    }
+    return JSON.parse(metadata);
+  }
+
+  clear() {
+    super.clear();
+    sessionStorage.removeItem(
+      getServerSpecificKey(SESSION_KEYS.SERVER_METADATA, this.serverUrl),
+    );
   }
 }
 
 // Factory function to create an OAuth provider for a specific MCP server
 export function createAuthProvider(
   mcpServerUuid: string,
+  serverUrl: string,
 ): DbOAuthClientProvider {
-  return new DbOAuthClientProvider(mcpServerUuid);
+  return new DbOAuthClientProvider(mcpServerUuid, serverUrl);
+}
+
+// Factory function to create a debug OAuth provider for a specific MCP server
+export function createDebugAuthProvider(
+  mcpServerUuid: string,
+  serverUrl: string,
+): DebugDbOAuthClientProvider {
+  return new DebugDbOAuthClientProvider(mcpServerUuid, serverUrl);
 }
