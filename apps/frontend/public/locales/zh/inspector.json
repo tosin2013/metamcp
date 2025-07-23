@@ -119,6 +119,7 @@
     "imageData": "图像数据",
     "audioData": "音频数据",
     "resource": "资源",
+    "resourceLink": "资源链接",
     "unknownFormat": "未知格式",
     "binaryData": "二进制数据：{{length}} 字符",
     "audioNotSupported": "您的浏览器不支持音频元素。",

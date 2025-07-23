@@ -33,26 +33,9 @@ interface Prompt {
   }>;
 }
 
-interface PromptMessage {
-  role: "user" | "assistant" | "system";
-  content: {
-    type: "text" | "image" | "audio" | "resource";
-    text?: string;
-    data?: string;
-    mimeType?: string;
-    resource?: {
-      uri: string;
-      mimeType?: string;
-      text?: string;
-      blob?: string;
-    };
-  };
-}
-
-interface PromptGetResponse {
-  description?: string;
-  messages: PromptMessage[];
-}
+// Use the actual MCP SDK types instead of custom interfaces
+type PromptGetResponse = z.infer<typeof GetPromptResultSchema>;
+type PromptMessage = PromptGetResponse["messages"][0];
 
 interface InspectorPromptsProps {
   makeRequest: <T extends z.ZodType>(
@@ -246,20 +229,20 @@ export function InspectorPrompts({
               <div className="font-mono text-xs break-all">
                 URI: {message.content.resource?.uri}
               </div>
-              {message.content.resource?.text && (
+              {message.content.resource?.text ? (
                 <div className="mt-1 text-sm">
-                  {message.content.resource.text}
+                  {String(message.content.resource.text)}
                 </div>
-              )}
-              {message.content.resource?.blob && (
+              ) : null}
+              {message.content.resource?.blob ? (
                 <div className="mt-1 text-xs">
                   [
                   {t("inspector:promptsComponent.binaryData", {
-                    length: message.content.resource.blob.length,
+                    length: String(message.content.resource.blob).length,
                   })}
                   ]
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}
