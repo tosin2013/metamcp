@@ -266,6 +266,9 @@ export function rateLimitAuth(
   const identifier = req.ip || req.connection.remoteAddress || "unknown";
 
   if (authEndpointLimiter.isRateLimited(identifier)) {
+    console.log(
+      `[RATE LIMIT] Authorization endpoint rate limited for IP: ${identifier} - Too many authorization attempts`,
+    );
     return res.status(429).json({
       error: "too_many_requests",
       error_description:
@@ -287,6 +290,9 @@ export function rateLimitToken(
   const identifier = req.ip || req.connection.remoteAddress || "unknown";
 
   if (tokenEndpointLimiter.isRateLimited(identifier)) {
+    console.log(
+      `[RATE LIMIT] Token endpoint rate limited for IP: ${identifier} - Too many token requests`,
+    );
     return res.status(429).json({
       error: "too_many_requests",
       error_description: "Too many token requests. Please try again later.",
