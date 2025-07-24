@@ -256,10 +256,17 @@ export function useConnection({
   });
 
   const is401Error = useMemoizedFn((error: unknown): boolean => {
-    return (
+    return Boolean(
       (error instanceof SseError && error.code === 401) ||
-      (error instanceof Error && error.message.includes("401")) ||
-      (error instanceof Error && error.message.includes("Unauthorized"))
+        (error instanceof Error && error.message.includes("401")) ||
+        (error instanceof Error && error.message.includes("Unauthorized")) ||
+        // Handle fetch errors that might come from streamable HTTP
+        (error instanceof TypeError && error.message.includes("401")) ||
+        // Handle response errors
+        (error &&
+          typeof error === "object" &&
+          "status" in error &&
+          (error as { status: number }).status === 401),
     );
   });
 
@@ -271,7 +278,7 @@ export function useConnection({
   });
 
   const handleAuthError = useMemoizedFn(async (error: unknown) => {
-    if (error instanceof SseError && error.code === 401) {
+    if (is401Error(error)) {
       sessionStorage.setItem(SESSION_KEYS.SERVER_URL, url || "");
       sessionStorage.setItem(SESSION_KEYS.MCP_SERVER_UUID, mcpServerUuid);
 
@@ -437,6 +444,7 @@ export function useConnection({
               mcpProxyServerUrl = new URL(`/mcp-proxy/server/mcp`, getAppUrl());
               mcpProxyServerUrl.searchParams.append("url", url);
               transportOptions = {
+                authProvider: authProvider,
                 eventSourceInit: {
                   fetch: (
                     url: string | URL | globalThis.Request,
