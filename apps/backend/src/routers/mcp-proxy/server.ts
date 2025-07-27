@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import {
   SSEClientTransport,
@@ -32,49 +32,44 @@ const defaultEnvironment = {
   ...getDefaultEnvironment(),
 };
 
-// Rate limiting for transport creation
-const RATE_LIMIT_COOLDOWN_MS = 2000; // 2 seconds
-const transportRateLimits = new Map<string, number>();
+// Cooldown mechanism for failed STDIO commands
+const STDIO_COOLDOWN_DURATION = 30000; // 30 seconds
+const stdioCommandCooldowns = new Map<string, number>();
 
-interface TransportQueryParams {
-  transportType?: string;
-  command?: string;
-  args?: string;
-  env?: string;
-  url?: string;
-}
-
-// Function to create a hash of transport parameters for rate limiting
-const createParametersHash = (query: TransportQueryParams): string => {
-  const params = {
-    transportType: query.transportType,
-    command: query.command,
-    args: query.args,
-    env: query.env,
-    url: query.url,
-  };
-  return createHash("sha256").update(JSON.stringify(params)).digest("hex");
+// Function to create a key for STDIO commands
+const createStdioKey = (
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+) => {
+  return `${command}:${args.join(",")}:${JSON.stringify(env)}`;
 };
 
-// Function to check and enforce rate limits
-const checkRateLimit = (paramsHash: string): boolean => {
-  const now = Date.now();
-  const lastCreated = transportRateLimits.get(paramsHash);
-
-  if (lastCreated && now - lastCreated < RATE_LIMIT_COOLDOWN_MS) {
-    return false; // Rate limited
+// Function to check if a STDIO command is in cooldown
+const isStdioInCooldown = (
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+): boolean => {
+  const key = createStdioKey(command, args, env);
+  const cooldownEnd = stdioCommandCooldowns.get(key);
+  if (cooldownEnd && Date.now() < cooldownEnd) {
+    return true;
   }
-
-  transportRateLimits.set(paramsHash, now);
-
-  // Clean up old entries to prevent memory leaks
-  for (const [hash, timestamp] of transportRateLimits.entries()) {
-    if (now - timestamp > RATE_LIMIT_COOLDOWN_MS) {
-      transportRateLimits.delete(hash);
-    }
+  if (cooldownEnd && Date.now() >= cooldownEnd) {
+    stdioCommandCooldowns.delete(key);
   }
+  return false;
+};
 
-  return true; // Allowed
+// Function to set a STDIO command in cooldown
+const setStdioCooldown = (
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+) => {
+  const key = createStdioKey(command, args, env);
+  stdioCommandCooldowns.set(key, Date.now() + STDIO_COOLDOWN_DURATION);
 };
 
 // Function to get HTTP headers.
@@ -164,16 +159,6 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
   const query = req.query;
   console.log("Query parameters:", JSON.stringify(query));
 
-  // Check rate limit based on parameters hash
-  const paramsHash = createParametersHash(query);
-  if (!checkRateLimit(paramsHash)) {
-    const error = new Error(
-      `Rate limit exceeded for transport creation. Please wait ${RATE_LIMIT_COOLDOWN_MS / 1000} seconds before retrying with the same parameters.`,
-    );
-    (error as any).code = "RATE_LIMIT_EXCEEDED";
-    throw error;
-  }
-
   const transportType = query.transportType as string;
 
   if (transportType === McpServerTypeEnum.Enum.STDIO) {
@@ -184,6 +169,19 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
 
     const { cmd, args } = findActualExecutable(command, origArgs);
 
+    // Check if this command is in cooldown
+    if (isStdioInCooldown(cmd, args, env)) {
+      console.log(`STDIO command in cooldown: ${cmd} ${args.join(" ")}`);
+      const cooldownEnd = stdioCommandCooldowns.get(
+        createStdioKey(cmd, args, env),
+      );
+      if (cooldownEnd) {
+        throw new Error(
+          `Command "${cmd} ${args.join(" ")}" is in cooldown. Please wait ${Math.ceil((cooldownEnd - Date.now()) / 1000)} seconds before retrying.`,
+        );
+      }
+    }
+
     console.log(`STDIO transport: command=${cmd}, args=${args}`);
 
     const transport = new StdioClientTransport({
@@ -193,8 +191,17 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
       stderr: "pipe",
     });
 
-    await transport.start();
-    return transport;
+    try {
+      await transport.start();
+      return transport;
+    } catch (error) {
+      // If the transport fails to start, put it in cooldown
+      setStdioCooldown(cmd, args, env);
+      console.log(
+        `STDIO command failed, setting cooldown: ${cmd} ${args.join(" ")}`,
+      );
+      throw error;
+    }
   } else if (transportType === McpServerTypeEnum.Enum.SSE) {
     const url = transformDockerUrl(query.url as string);
 
@@ -428,9 +435,34 @@ serverRouter.get("/stdio", async (req, res) => {
     await webAppTransport.start();
 
     const stdinTransport = serverTransport as StdioClientTransport;
+
+    // Monitor for quick failures and set cooldown
+    const commandStartTime = Date.now();
+    const QUICK_FAILURE_THRESHOLD = 5000; // 5 seconds
+
+    // Handle transport close events
+    stdinTransport.onclose = () => {
+      const runTime = Date.now() - commandStartTime;
+      if (runTime < QUICK_FAILURE_THRESHOLD) {
+        // Process failed quickly, likely a startup error
+        const query = req.query;
+        const command = query.command as string;
+        const origArgs = shellParseArgs(query.args as string) as string[];
+        const queryEnv = query.env ? JSON.parse(query.env as string) : {};
+        const env = { ...process.env, ...defaultEnvironment, ...queryEnv };
+        const { cmd, args } = findActualExecutable(command, origArgs);
+
+        setStdioCooldown(cmd, args, env);
+        console.log(
+          `STDIO process terminated quickly (${runTime}ms), setting cooldown: ${cmd} ${args.join(" ")}`,
+        );
+      }
+    };
+
     if (stdinTransport.stderr) {
       stdinTransport.stderr.on("data", (chunk) => {
-        if (chunk.toString().includes("MODULE_NOT_FOUND")) {
+        const errorContent = chunk.toString();
+        if (errorContent.includes("MODULE_NOT_FOUND")) {
           webAppTransport.send({
             jsonrpc: "2.0",
             method: "notifications/stderr",
@@ -442,11 +474,29 @@ serverRouter.get("/stdio", async (req, res) => {
           cleanupSession(webAppTransport.sessionId);
           console.error("Command not found, transports removed");
         } else {
+          // Check for common startup errors that should trigger cooldown
+          if (
+            errorContent.includes("ENOENT") ||
+            errorContent.includes("no such file or directory")
+          ) {
+            const query = req.query;
+            const command = query.command as string;
+            const origArgs = shellParseArgs(query.args as string) as string[];
+            const queryEnv = query.env ? JSON.parse(query.env as string) : {};
+            const env = { ...process.env, ...defaultEnvironment, ...queryEnv };
+            const { cmd, args } = findActualExecutable(command, origArgs);
+
+            setStdioCooldown(cmd, args, env);
+            console.log(
+              `STDIO process reported startup error, setting cooldown: ${cmd} ${args.join(" ")}`,
+            );
+          }
+
           webAppTransport.send({
             jsonrpc: "2.0",
             method: "notifications/stderr",
             params: {
-              content: chunk.toString(),
+              content: errorContent,
             },
           });
         }
