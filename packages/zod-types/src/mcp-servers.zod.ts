@@ -222,7 +222,12 @@ export const BulkImportMcpServerSchema = z
         // Map common variations to the correct enum values
         if (upperVal === "STDIO" || upperVal === "STD") return "STDIO";
         if (upperVal === "SSE") return "SSE";
-        if (upperVal === "STREAMABLE_HTTP" || upperVal === "STREAMABLEHTTP" || upperVal === "HTTP") return "STREAMABLE_HTTP";
+        if (
+          upperVal === "STREAMABLE_HTTP" ||
+          upperVal === "STREAMABLEHTTP" ||
+          upperVal === "HTTP"
+        )
+          return "STREAMABLE_HTTP";
         return upperVal; // Return as-is if it doesn't match known patterns
       })
       .pipe(McpServerTypeEnum.optional()),
