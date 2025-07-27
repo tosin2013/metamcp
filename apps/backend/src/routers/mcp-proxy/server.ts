@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   SSEClientTransport,
@@ -30,6 +30,51 @@ const STREAMABLE_HTTP_HEADERS_PASSTHROUGH = [
 
 const defaultEnvironment = {
   ...getDefaultEnvironment(),
+};
+
+// Rate limiting for transport creation
+const RATE_LIMIT_COOLDOWN_MS = 2000; // 2 seconds
+const transportRateLimits = new Map<string, number>();
+
+interface TransportQueryParams {
+  transportType?: string;
+  command?: string;
+  args?: string;
+  env?: string;
+  url?: string;
+}
+
+// Function to create a hash of transport parameters for rate limiting
+const createParametersHash = (query: TransportQueryParams): string => {
+  const params = {
+    transportType: query.transportType,
+    command: query.command,
+    args: query.args,
+    env: query.env,
+    url: query.url,
+  };
+  return createHash("sha256").update(JSON.stringify(params)).digest("hex");
+};
+
+// Function to check and enforce rate limits
+const checkRateLimit = (paramsHash: string): boolean => {
+  const now = Date.now();
+  const lastCreated = transportRateLimits.get(paramsHash);
+
+  if (lastCreated && now - lastCreated < RATE_LIMIT_COOLDOWN_MS) {
+    return false; // Rate limited
+  }
+
+  transportRateLimits.set(paramsHash, now);
+
+  // Clean up old entries to prevent memory leaks
+  for (const [hash, timestamp] of transportRateLimits.entries()) {
+    if (now - timestamp > RATE_LIMIT_COOLDOWN_MS) {
+      transportRateLimits.delete(hash);
+    }
+  }
+
+  return true; // Allowed
 };
 
 // Function to get HTTP headers.
@@ -118,6 +163,16 @@ const cleanupSession = async (sessionId: string, mcpServerName?: string) => {
 const createTransport = async (req: express.Request): Promise<Transport> => {
   const query = req.query;
   console.log("Query parameters:", JSON.stringify(query));
+
+  // Check rate limit based on parameters hash
+  const paramsHash = createParametersHash(query);
+  if (!checkRateLimit(paramsHash)) {
+    const error = new Error(
+      `Rate limit exceeded for transport creation. Please wait ${RATE_LIMIT_COOLDOWN_MS / 1000} seconds before retrying with the same parameters.`,
+    );
+    (error as any).code = "RATE_LIMIT_EXCEEDED";
+    throw error;
+  }
 
   const transportType = query.transportType as string;
 
