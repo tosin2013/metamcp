@@ -33,7 +33,7 @@ const defaultEnvironment = {
 };
 
 // Cooldown mechanism for failed STDIO commands
-const STDIO_COOLDOWN_DURATION = 30000; // 30 seconds
+const STDIO_COOLDOWN_DURATION = 10000; // 10 seconds
 const stdioCommandCooldowns = new Map<string, number>();
 
 // Function to create a key for STDIO commands
