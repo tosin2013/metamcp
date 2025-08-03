@@ -77,7 +77,7 @@ export class AuthRateLimiter {
 }
 
 // Create rate limiter instance for failed authentication attempts
-export const authRateLimiter = new AuthRateLimiter(10, 1 * 60 * 1000); // 10 attempts per 1 minute
+export const authRateLimiter = new AuthRateLimiter(20, 1 * 60 * 1000); // 20 attempts per 1 minute
 
 // Clean up rate limiter entries every 10 minutes
 setInterval(
@@ -95,7 +95,7 @@ export function getAuthRateLimitIdentifier(
   req: express.Request,
   endpoint: DatabaseEndpoint,
 ): string {
-  const ip = req.ip || req.connection.remoteAddress || "unknown";
+  const ip = req.ip || req.socket?.remoteAddress || "unknown";
   const endpointId = endpoint.uuid || endpoint.name || "unknown";
   return `${ip}:${endpointId}`;
 }

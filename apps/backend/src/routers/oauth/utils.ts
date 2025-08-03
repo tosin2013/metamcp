@@ -244,7 +244,7 @@ class RateLimiter {
 
 // Create rate limiter instances
 const authEndpointLimiter = new RateLimiter(20, 1 * 60 * 1000); // 20 attempts per 1 minute
-const tokenEndpointLimiter = new RateLimiter(10, 1 * 60 * 1000); // 10 attempts per 1 minute
+const tokenEndpointLimiter = new RateLimiter(20, 1 * 60 * 1000); // 10 attempts per 1 minute
 
 // Clean up rate limiter entries every 10 minutes
 setInterval(
@@ -263,7 +263,7 @@ export function rateLimitAuth(
   res: express.Response,
   next: express.NextFunction,
 ) {
-  const identifier = req.ip || req.connection.remoteAddress || "unknown";
+  const identifier = req.ip || req.socket?.remoteAddress || "unknown";
 
   if (authEndpointLimiter.isRateLimited(identifier)) {
     console.log(
@@ -287,7 +287,7 @@ export function rateLimitToken(
   res: express.Response,
   next: express.NextFunction,
 ) {
-  const identifier = req.ip || req.connection.remoteAddress || "unknown";
+  const identifier = req.ip || req.socket?.remoteAddress || "unknown";
 
   if (tokenEndpointLimiter.isRateLimited(identifier)) {
     console.log(
