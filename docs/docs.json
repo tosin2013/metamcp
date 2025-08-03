@@ -66,6 +66,12 @@
         ]
       },
       {
+        "group": "Troubleshooting",
+        "pages": [
+          "troubleshooting/oauth-troubleshooting"
+        ]
+      },
+      {
         "group": "Development",
         "pages": [
           "development/contributing",
