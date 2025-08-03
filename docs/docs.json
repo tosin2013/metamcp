@@ -75,6 +75,12 @@
               "en/development/i18n",
               "en/development/architecture"
             ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "en/troubleshooting/oauth-troubleshooting"
+            ]
           }
         ]
       },
@@ -118,6 +124,12 @@
               "cn/development/contributing",
               "cn/development/i18n",
               "cn/development/architecture"
+            ]
+          },
+          {
+            "group": "故障排除",
+            "pages": [
+              "cn/troubleshooting/oauth-troubleshooting"
             ]
           }
         ]

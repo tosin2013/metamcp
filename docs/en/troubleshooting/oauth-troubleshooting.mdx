@@ -181,24 +181,8 @@ curl -H "Authorization: Bearer mcp_token_1234567890abcdef" \
 
 **Solutions**:
 
-1. **Wait for rate limit to reset** (usually 15 minutes)
-2. **Verify credentials are correct**:
-   ```bash
-   # Test API key
-   curl -H "X-API-Key: your-api-key" \
-     https://your-domain.com/api/health
-   
-   # Test OAuth token
-   curl -H "Authorization: Bearer your-oauth-token" \
-     https://your-domain.com/api/health
-   ```
-
-3. **Check token expiration**:
-   ```bash
-   # Introspect OAuth token
-   curl -X POST https://your-domain.com/oauth/introspect \
-     -H "Content-Type: application/json" \
-     -d '{"token": "your-oauth-token"}'
+1. **Wait for rate limit to reset** (1 minute)
+2. If you have enabled Auth, make sure you never pass in a wrong API key.
    ```
 
 ### Issue 3: Access Denied (403) Errors
@@ -238,73 +222,3 @@ curl -H "Authorization: Bearer mcp_token_1234567890abcdef" \
 2. **Use correct authentication method**:
    - API key: `X-API-Key` header or `api_key` query parameter
    - OAuth: `Authorization: Bearer` header
-
-## Debugging Authentication
-
-### Check Current Authentication Status
-
-```bash
-# Test endpoint without authentication
-curl -v https://your-domain.com/api/endpoint
-
-# Test with API key
-curl -v -H "X-API-Key: your-api-key" \
-  https://your-domain.com/api/endpoint
-
-# Test with OAuth token
-curl -v -H "Authorization: Bearer your-oauth-token" \
-  https://your-domain.com/api/endpoint
-```
-
-### Verify Token Validity
-
-```bash
-# Introspect OAuth token
-curl -X POST https://your-domain.com/oauth/introspect \
-  -H "Content-Type: application/json" \
-  -d '{"token": "your-oauth-token"}'
-
-# Check API key details
-curl -H "Authorization: Bearer your-session-token" \
-  https://your-domain.com/api/api-keys/your-api-key-uuid
-```
-
-### Monitor Authentication Logs
-
-```bash
-# Check server logs for authentication attempts
-docker logs metamcp-backend | grep -i "auth\|oauth\|api.*key"
-
-# Check rate limiting status
-curl -H "Authorization: Bearer your-token" \
-  https://your-domain.com/api/rate-limit-status
-```
-
-## Best Practices
-
-1. **Choose the right authentication method**:
-   - Use API keys for simple integrations
-   - Use OAuth for user-specific access
-   - Use both for maximum flexibility
-
-2. **Handle rate limiting gracefully**:
-   - Implement exponential backoff
-   - Cache valid tokens
-   - Monitor authentication failures
-
-3. **Test authentication thoroughly**:
-   - Test with valid credentials
-   - Test with invalid credentials
-   - Test with missing credentials
-
-4. **Monitor authentication patterns**:
-   - Track failed authentication attempts
-   - Monitor rate limiting events
-   - Alert on unusual authentication patterns
-
-## Related Documentation
-
-- [OAuth Integration Guide](./oauth.mdx)
-- [API Keys Management](./api-keys.mdx)
-- [Endpoint Configuration](./endpoints.mdx)
-- [Rate Limiting](./rate-limiting.mdx) 
