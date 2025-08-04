@@ -119,10 +119,8 @@ const webAppTransports: Map<string, Transport> = new Map<string, Transport>(); /
 const serverTransports: Map<string, Transport> = new Map<string, Transport>(); // Server Transports by web app sessionId
 
 // Session cleanup function
-const cleanupSession = async (sessionId: string, mcpServerName?: string) => {
-  console.log(
-    `Cleaning up proxy session ${sessionId} for MCP server: ${mcpServerName || "Unknown"}`,
-  );
+const cleanupSession = async (sessionId: string) => {
+  console.log(`Cleaning up proxy session ${sessionId}`);
 
   // Clean up web app transport
   const webAppTransport = webAppTransports.get(sessionId);
@@ -304,13 +302,16 @@ serverRouter.post("/mcp", async (req, res) => {
         mcpProxy({
           transportToClient: webAppTransport,
           transportToServer: serverTransport,
+          onCleanup: async () => {
+            await cleanupSession(newSessionId);
+          },
         });
       } catch (error) {
         console.error(
           `Error setting up proxy for session ${newSessionId}:`,
           error,
         );
-        await cleanupSession(newSessionId, req.query.mcpServerName as string);
+        await cleanupSession(newSessionId);
         throw error;
       }
 
@@ -369,7 +370,7 @@ serverRouter.delete("/mcp", async (req, res) => {
         // Continue with cleanup even if termination fails
       }
 
-      await cleanupSession(sessionId, mcpServerName);
+      await cleanupSession(sessionId);
       console.log(
         `Session ${sessionId} terminated and cleaned up successfully`,
       );
@@ -413,12 +414,8 @@ serverRouter.get("/stdio", async (req, res) => {
 
     // Handle cleanup when connection closes
     const handleConnectionClose = () => {
-      const mcpServerName =
-        (req.query.mcpServerName as string) || "Unknown Server";
-      console.log(
-        `Connection closed for session ${webAppTransport.sessionId}, MCP server: ${mcpServerName}`,
-      );
-      cleanupSession(webAppTransport.sessionId, mcpServerName);
+      console.log(`Connection closed for session ${webAppTransport.sessionId}`);
+      cleanupSession(webAppTransport.sessionId);
     };
 
     // Handle various connection termination scenarios
@@ -463,13 +460,20 @@ serverRouter.get("/stdio", async (req, res) => {
       stdinTransport.stderr.on("data", (chunk) => {
         const errorContent = chunk.toString();
         if (errorContent.includes("MODULE_NOT_FOUND")) {
-          webAppTransport.send({
-            jsonrpc: "2.0",
-            method: "notifications/stderr",
-            params: {
-              content: "Command not found, transports removed",
-            },
-          });
+          webAppTransport
+            .send({
+              jsonrpc: "2.0",
+              method: "notifications/stderr",
+              params: {
+                content: "Command not found, transports removed",
+              },
+            })
+            .catch((error) => {
+              // Ignore "Not connected" errors during cleanup
+              if (error?.message && !error.message.includes("Not connected")) {
+                console.error("Error sending stderr notification:", error);
+              }
+            });
           webAppTransport.close();
           cleanupSession(webAppTransport.sessionId);
           console.error("Command not found, transports removed");
@@ -492,13 +496,20 @@ serverRouter.get("/stdio", async (req, res) => {
             );
           }
 
-          webAppTransport.send({
-            jsonrpc: "2.0",
-            method: "notifications/stderr",
-            params: {
-              content: errorContent,
-            },
-          });
+          webAppTransport
+            .send({
+              jsonrpc: "2.0",
+              method: "notifications/stderr",
+              params: {
+                content: errorContent,
+              },
+            })
+            .catch((error) => {
+              // Ignore "Not connected" errors as they're expected when connections close
+              if (error?.message && !error.message.includes("Not connected")) {
+                console.error("Error sending stderr notification:", error);
+              }
+            });
         }
       });
     }
@@ -506,6 +517,9 @@ serverRouter.get("/stdio", async (req, res) => {
     mcpProxy({
       transportToClient: webAppTransport,
       transportToServer: serverTransport,
+      onCleanup: async () => {
+        await cleanupSession(webAppTransport.sessionId);
+      },
     });
   } catch (error) {
     console.error("Error in /stdio route:", error);
@@ -556,12 +570,10 @@ serverRouter.get("/sse", async (req, res) => {
 
       // Handle cleanup when connection closes
       const handleConnectionClose = () => {
-        const mcpServerName =
-          (req.query.mcpServerName as string) || "Unknown Server";
         console.log(
-          `Connection closed for session ${webAppTransport.sessionId}, MCP server: ${mcpServerName}`,
+          `Connection closed for session ${webAppTransport.sessionId}`,
         );
-        cleanupSession(webAppTransport.sessionId, mcpServerName);
+        cleanupSession(webAppTransport.sessionId);
       };
 
       // Handle various connection termination scenarios
@@ -580,6 +592,9 @@ serverRouter.get("/sse", async (req, res) => {
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: serverTransport,
+        onCleanup: async () => {
+          await cleanupSession(webAppTransport.sessionId);
+        },
       });
     }
   } catch (error) {

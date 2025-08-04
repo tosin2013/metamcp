@@ -115,6 +115,7 @@ export function EditEndpoint({
       description: "",
       namespaceUuid: "",
       enableApiKeyAuth: true,
+      enableOauth: false,
       useQueryParamAuth: false,
     },
   });
@@ -127,6 +128,7 @@ export function EditEndpoint({
         description: endpoint.description || "",
         namespaceUuid: endpoint.namespace.uuid,
         enableApiKeyAuth: endpoint.enable_api_key_auth ?? true,
+        enableOauth: endpoint.enable_oauth ?? false,
         useQueryParamAuth: endpoint.use_query_param_auth ?? false,
       });
       setSelectedNamespaceUuid(endpoint.namespace.uuid);
@@ -158,6 +160,7 @@ export function EditEndpoint({
         description: data.description,
         namespaceUuid: data.namespaceUuid,
         enableApiKeyAuth: data.enableApiKeyAuth,
+        enableOauth: data.enableOauth,
         useQueryParamAuth: data.useQueryParamAuth,
       };
 
@@ -175,7 +178,14 @@ export function EditEndpoint({
 
   const handleClose = () => {
     onClose();
-    editForm.reset();
+    editForm.reset({
+      name: "",
+      description: "",
+      namespaceUuid: "",
+      enableApiKeyAuth: true,
+      enableOauth: false,
+      useQueryParamAuth: false,
+    });
     setSelectedNamespaceUuid("");
     setSelectedNamespaceName("");
   };
@@ -334,6 +344,41 @@ export function EditEndpoint({
                     }
                     disabled={isUpdating}
                   />
+                </div>
+              )}
+            </div>
+
+            {/* OAuth Authentication Settings */}
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="text-sm font-medium">
+                {t("endpoints:edit.oauthAuthSection")}
+              </h4>
+
+              {/* Enable OAuth Auth */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">
+                    {t("endpoints:edit.enableOauthLabel")}
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    {t("endpoints:edit.enableOauthDescription")}
+                  </p>
+                </div>
+                <Switch
+                  checked={editForm.watch("enableOauth")}
+                  onCheckedChange={(checked) =>
+                    editForm.setValue("enableOauth", checked)
+                  }
+                  disabled={isUpdating}
+                />
+              </div>
+
+              {/* OAuth HTTPS Warning */}
+              {editForm.watch("enableOauth") && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800">
+                    {t("endpoints:edit.oauthHttpsWarning")}
+                  </p>
                 </div>
               )}
             </div>

@@ -65,7 +65,9 @@
             "pages": [
               "en/integrations/cursor",
               "en/integrations/claude-desktop",
-              "en/integrations/open-web-ui"
+              "en/integrations/open-web-ui",
+              "en/integrations/general-stdio-with-api-key",
+              "en/integrations/general-stdio-with-oauth"
             ]
           },
           {
@@ -74,6 +76,12 @@
               "en/development/contributing",
               "en/development/i18n",
               "en/development/architecture"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "en/troubleshooting/oauth-troubleshooting"
             ]
           }
         ]
@@ -109,7 +117,9 @@
             "pages": [
               "cn/integrations/cursor",
               "cn/integrations/claude-desktop",
-              "cn/integrations/open-web-ui"
+              "cn/integrations/open-web-ui",
+              "cn/integrations/general-stdio-with-api-key",
+              "cn/integrations/general-stdio-with-oauth"
             ]
           },
           {
@@ -118,6 +128,12 @@
               "cn/development/contributing",
               "cn/development/i18n",
               "cn/development/architecture"
+            ]
+          },
+          {
+            "group": "故障排除",
+            "pages": [
+              "cn/troubleshooting/oauth-troubleshooting"
             ]
           }
         ]

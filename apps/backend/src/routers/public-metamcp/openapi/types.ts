@@ -1,4 +1,4 @@
-import { ApiKeyAuthenticatedRequest } from "../../../middleware/api-key-auth.middleware";
+import { ApiKeyAuthenticatedRequest } from "@/middleware/api-key-oauth.middleware";
 
 export interface ToolExecutionRequest extends ApiKeyAuthenticatedRequest {
   params: { tool_name: string };

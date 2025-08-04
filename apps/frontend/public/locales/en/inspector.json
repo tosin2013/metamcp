@@ -119,6 +119,7 @@
     "imageData": "Image data",
     "audioData": "Audio data",
     "resource": "Resource",
+    "resourceLink": "Resource link",
     "unknownFormat": "unknown format",
     "binaryData": "Binary data: {{length}} chars",
     "audioNotSupported": "Your browser does not support the audio element.",

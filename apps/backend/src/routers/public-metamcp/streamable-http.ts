@@ -3,12 +3,13 @@ import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
 
-import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 import {
   ApiKeyAuthenticatedRequest,
   authenticateApiKey,
-} from "../../middleware/api-key-auth.middleware";
-import { lookupEndpoint } from "./openapi";
+} from "@/middleware/api-key-oauth.middleware";
+import { lookupEndpoint } from "@/middleware/lookup-endpoint-middleware";
+
+import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 
 const streamableHttpRouter = express.Router();
 
@@ -65,6 +66,11 @@ streamableHttpRouter.post(
     const authReq = req as ApiKeyAuthenticatedRequest;
     const { namespaceUuid, endpointName } = authReq;
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+    // Log authentication information for debugging
+    console.log(`POST /mcp request for endpoint: ${endpointName}`);
+    console.log(`Authentication method: ${authReq.authMethod || "none"}`);
+    console.log(`Session ID: ${sessionId || "new session"}`);
 
     if (!sessionId) {
       try {
@@ -123,7 +129,16 @@ streamableHttpRouter.post(
         await transport.handleRequest(req, res);
       } catch (error) {
         console.error("Error in public endpoint /mcp POST route:", error);
-        res.status(500).json(error);
+
+        // Provide more detailed error information
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        res.status(500).json({
+          error: "Internal server error",
+          message: errorMessage,
+          endpoint: endpointName,
+          timestamp: new Date().toISOString(),
+        });
       }
     } else {
       // console.log(
@@ -138,13 +153,27 @@ streamableHttpRouter.post(
             `Transport not found for sessionId ${sessionId}. Available sessions:`,
             Object.keys(transports),
           );
-          res.status(404).end("Transport not found for sessionId " + sessionId);
+          res.status(404).json({
+            error: "Session not found",
+            message: `Transport not found for sessionId ${sessionId}`,
+            available_sessions: Object.keys(transports),
+            timestamp: new Date().toISOString(),
+          });
         } else {
           await transport.handleRequest(req, res);
         }
       } catch (error) {
         console.error("Error in public endpoint /mcp route:", error);
-        res.status(500).json(error);
+
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        res.status(500).json({
+          error: "Internal server error",
+          message: errorMessage,
+          session_id: sessionId,
+          endpoint: endpointName,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
   },

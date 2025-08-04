@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { useTranslations } from "@/hooks/useTranslations";
 
-import { SESSION_KEYS } from "../lib/constants";
+import { getServerSpecificKey, SESSION_KEYS } from "../lib/constants";
 import { createAuthProvider } from "../lib/oauth-provider";
 import { vanillaTrpcClient } from "../lib/trpc";
 
@@ -35,8 +35,8 @@ const OAuthCallback = () => {
       }
 
       try {
-        // Create auth provider with existing server UUID
-        const authProvider = createAuthProvider(mcpServerUuid);
+        // Create auth provider with existing server UUID and URL
+        const authProvider = createAuthProvider(mcpServerUuid, serverUrl);
 
         // Complete the OAuth flow
         const result = await auth(authProvider, {
@@ -51,14 +51,19 @@ const OAuthCallback = () => {
         }
 
         // Transfer OAuth data from session storage to database
-        const storagePrefix = `oauth_${mcpServerUuid}_`;
-        const clientInformation = sessionStorage.getItem(
-          `${storagePrefix}client_information`,
+        const clientInformationKey = getServerSpecificKey(
+          SESSION_KEYS.CLIENT_INFORMATION,
+          serverUrl,
         );
-        const tokens = sessionStorage.getItem(`${storagePrefix}tokens`);
-        const codeVerifier = sessionStorage.getItem(
-          `${storagePrefix}code_verifier`,
+        const tokensKey = getServerSpecificKey(SESSION_KEYS.TOKENS, serverUrl);
+        const codeVerifierKey = getServerSpecificKey(
+          SESSION_KEYS.CODE_VERIFIER,
+          serverUrl,
         );
+
+        const clientInformation = sessionStorage.getItem(clientInformationKey);
+        const tokens = sessionStorage.getItem(tokensKey);
+        const codeVerifier = sessionStorage.getItem(codeVerifierKey);
 
         // Save OAuth session in database using tRPC
         await vanillaTrpcClient.frontend.oauth.upsert.mutate({
@@ -71,9 +76,9 @@ const OAuthCallback = () => {
         });
 
         // Clean up session storage
-        sessionStorage.removeItem(`${storagePrefix}client_information`);
-        sessionStorage.removeItem(`${storagePrefix}tokens`);
-        sessionStorage.removeItem(`${storagePrefix}code_verifier`);
+        sessionStorage.removeItem(clientInformationKey);
+        sessionStorage.removeItem(tokensKey);
+        sessionStorage.removeItem(codeVerifierKey);
         sessionStorage.removeItem(SESSION_KEYS.SERVER_URL);
         sessionStorage.removeItem(SESSION_KEYS.MCP_SERVER_UUID);
 

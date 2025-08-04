@@ -3,6 +3,7 @@ import express from "express";
 import { auth } from "./auth";
 import { initializeIdleServers } from "./lib/startup";
 import mcpProxyRouter from "./routers/mcp-proxy";
+import oauthRouter from "./routers/oauth";
 import publicEndpointsRouter from "./routers/public-metamcp";
 import trpcRouter from "./routers/trpc";
 
@@ -17,6 +18,9 @@ app.use((req, res, next) => {
     express.json({ limit: "50mb" })(req, res, next);
   }
 });
+
+// Mount OAuth metadata endpoints at root level for .well-known discovery
+app.use(oauthRouter);
 
 // Mount better-auth routes by calling auth API directly
 app.use(async (req, res, next) => {
@@ -89,8 +93,14 @@ app.listen(12009, async () => {
   );
   console.log(`tRPC routes available at: http://localhost:12009/trpc`);
 
-  // Initialize idle servers after server starts
-  await initializeIdleServers();
+  // Wait a moment for the server to be fully ready to handle incoming connections,
+  // then initialize idle servers (prevents connection errors when MCP servers connect back)
+  console.log(
+    "Waiting for server to be fully ready before initializing idle servers...",
+  );
+  await new Promise((resolve) => setTimeout(resolve, 3000)).then(
+    initializeIdleServers,
+  );
 });
 
 app.get("/health", (req, res) => {

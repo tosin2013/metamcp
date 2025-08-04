@@ -44,8 +44,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/trpc") ||
     pathname.startsWith("/mcp-proxy") ||
     pathname.startsWith("/metamcp") ||
+    pathname.startsWith("/oauth") ||
+    pathname.startsWith("/.well-known") ||
     pathname.startsWith("/service") ||
     pathname.startsWith("/health") ||
+    pathname.startsWith("/fe-oauth") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
@@ -119,6 +122,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Skip all internal paths (_next, etc.)
-    "/((?!_next|api/|trpc|mcp-proxy|metamcp|service|health|.*\\..*).*)",
+    "/((?!_next|api/|trpc|mcp-proxy|metamcp|oauth|fe-oauth|\\.well-known|service|health|.*\\..*).*)",
   ],
 };

@@ -2,12 +2,13 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express from "express";
 
-import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 import {
   ApiKeyAuthenticatedRequest,
   authenticateApiKey,
-} from "../../middleware/api-key-auth.middleware";
-import { lookupEndpoint } from "./openapi";
+} from "@/middleware/api-key-oauth.middleware";
+import { lookupEndpoint } from "@/middleware/lookup-endpoint-middleware";
+
+import { metaMcpServerPool } from "../../lib/metamcp/metamcp-server-pool";
 
 const sseRouter = express.Router();
 

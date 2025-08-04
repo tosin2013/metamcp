@@ -50,8 +50,7 @@ export default function NamespacesPage() {
 
   // tRPC mutation for creating namespace
   const createNamespaceMutation = trpc.frontend.namespaces.create.useMutation({
-    onSuccess: (data) => {
-      console.log("Namespace created successfully:", data);
+    onSuccess: (_data) => {
       toast.success(t("namespaces:namespaceCreated"), {
         description: t("namespaces:namespaceCreatedDescription", {
           name: form.getValues().name,
