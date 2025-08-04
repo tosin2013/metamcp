@@ -88,29 +88,6 @@ Since MetaMCP endpoints are remote only, you need `mcp-proxy` to convert between
 ```
 </CodeGroup>
 
-## Client-Specific Configuration
-
-### Claude Desktop
-
-Configuration file location:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/claude/claude_desktop_config.json`
-
-### Cursor
-
-Configuration file location:
-- **macOS**: `~/Library/Application Support/Cursor/User/globalStorage/continue.mcp-servers`
-- **Windows**: `%APPDATA%\Cursor\User\globalStorage\continue.mcp-servers`
-- **Linux**: `~/.config/Cursor/User/globalStorage/continue.mcp-servers`
-
-### Other Clients
-
-For other MCP clients, refer to their documentation for:
-- Configuration file location
-- JSON structure requirements
-- Environment variable support
-
 ## Authentication Methods
 
 <AccordionGroup>
@@ -194,3 +171,21 @@ Enable debug logging for mcp-proxy:
 - **Replace** `sk_mt_your_api_key_here` with your MetaMCP API key
 - **mcp-proxy** handles the protocol conversion between stdio and Streamable HTTP/SSE
 - **Environment variables** are the secure way to pass API keys
+
+<CardGroup cols={2}>
+  <Card title="General Stdio Integration using `mcp-remote` with OAuth` with API Key" icon="globe" href="/en/integrations/general-stdio-with-oauth">
+    Configure any stdio-based MCP client to connect to MetaMCP endpoints using mcp-remote with OAuth
+  </Card>
+
+  <Card title="MCP OAuth Troubleshooting" icon="lock" href="/en/troubleshooting/oauth-troubleshooting">
+    Troubleshoot common OAuth-related issues
+  </Card>
+  
+  <Card title="Connect to Cursor" icon="mouse-pointer-2" href="/en/integrations/cursor">
+    Configure Cursor IDE to use your MetaMCP endpoints
+  </Card>
+  
+  <Card title="Connect to Claude Desktop" icon="monitor-dot" href="/en/integrations/claude-desktop">
+    Set up Claude Desktop with MetaMCP using mcp-proxy
+  </Card>
+</CardGroup>
