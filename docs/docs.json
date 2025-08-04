@@ -65,7 +65,8 @@
             "pages": [
               "en/integrations/cursor",
               "en/integrations/claude-desktop",
-              "en/integrations/open-web-ui"
+              "en/integrations/open-web-ui",
+              "en/integrations/general-stdio-with-api-key"
             ]
           },
           {
@@ -115,7 +116,8 @@
             "pages": [
               "cn/integrations/cursor",
               "cn/integrations/claude-desktop",
-              "cn/integrations/open-web-ui"
+              "cn/integrations/open-web-ui",
+              "cn/integrations/general-stdio-with-api-key"
             ]
           },
           {
