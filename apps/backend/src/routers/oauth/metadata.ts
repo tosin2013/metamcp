@@ -20,9 +20,13 @@ metadataRouter.get(
       // The authorization server is hosted at the same base URL
       const authServerUrl = baseUrl;
 
+      // Ensure the resource URL has a trailing slash for OAuth validation
+      // This is required by RFC 9728 for exact resource matching
+      const resourceUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+
       const metadata = {
         // Resource identifier - the protected resource's canonical URI
-        resource: baseUrl,
+        resource: resourceUrl,
 
         // List of OAuth authorization server issuer identifiers
         // Point to our better-auth authorization server
@@ -92,9 +96,13 @@ metadataRouter.get(
     try {
       const baseUrl = getBaseUrl(req);
 
+      // Ensure the issuer URL has a trailing slash for OAuth validation
+      // This is required by RFC 8414 and RFC 9728 for exact matching
+      const issuerUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+
       const metadata = {
         // Issuer identifier (required by RFC 8414)
-        issuer: baseUrl,
+        issuer: issuerUrl,
 
         // MCP-compatible OAuth endpoints (proxied through frontend)
         authorization_endpoint: `${baseUrl}/oauth/authorize`,
