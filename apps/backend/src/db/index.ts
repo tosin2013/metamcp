@@ -24,7 +24,3 @@ pool.on("error", (err) => {
 
 export const db = drizzle(pool, { schema });
 
-// Optional: If your process manager handles signals, you can close the pool on shutdown
-// without calling process.exit to satisfy linters and avoid side effects.
-// Example:
-// process.on("SIGTERM", () => void pool.end());
