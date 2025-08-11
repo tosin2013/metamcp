@@ -3,11 +3,11 @@ import { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol";
 import {
   CallToolRequestSchema,
   CallToolResult,
-  // Add notification types for handling incoming notifications
   CancelledNotificationSchema,
   CompatibilityCallToolResultSchema,
   GetPromptRequestSchema,
   GetPromptResultSchema,
+  InitializedNotificationSchema,
   ListPromptsRequestSchema,
   ListPromptsResultSchema,
   ListResourcesRequestSchema,
@@ -17,12 +17,14 @@ import {
   ListToolsRequestSchema,
   ListToolsResultSchema,
   LoggingMessageNotificationSchema,
+  ProgressNotificationSchema,
   PromptListChangedNotificationSchema,
   ReadResourceRequestSchema,
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ResourceTemplate,
   ResourceUpdatedNotificationSchema,
+  RootsListChangedNotificationSchema,
   Tool,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -175,10 +177,13 @@ export const createServer = async (
     // Set up handlers for various notification types from the sub MCP server
     const notificationSchemas = [
       CancelledNotificationSchema,
+      InitializedNotificationSchema,
       LoggingMessageNotificationSchema,
+      ProgressNotificationSchema,
       PromptListChangedNotificationSchema,
       ResourceListChangedNotificationSchema,
       ResourceUpdatedNotificationSchema,
+      RootsListChangedNotificationSchema,
       ToolListChangedNotificationSchema,
     ];
 
