@@ -13,9 +13,7 @@ export const createConfigRouter = (implementations: {
     enabled: boolean;
   }) => Promise<{ success: boolean }>;
   getMcpTimeout: () => Promise<number>;
-  setMcpTimeout: (input: {
-    timeout: number;
-  }) => Promise<{ success: boolean }>;
+  setMcpTimeout: (input: { timeout: number }) => Promise<{ success: boolean }>;
   getMcpMaxTotalTimeout: () => Promise<number>;
   setMcpMaxTotalTimeout: (input: {
     timeout: number;

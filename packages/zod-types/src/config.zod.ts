@@ -5,7 +5,7 @@ export const ConfigKeyEnum = z.enum([
   "DISABLE_SIGNUP",
   "MCP_RESET_TIMEOUT_ON_PROGRESS",
   "MCP_TIMEOUT",
-  "MCP_MAX_TOTAL_TIMEOUT"
+  "MCP_MAX_TOTAL_TIMEOUT",
 ]);
 
 // Config schema

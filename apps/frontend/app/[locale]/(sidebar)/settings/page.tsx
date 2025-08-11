@@ -9,16 +9,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { useTranslations } from "@/hooks/useTranslations";
 import { trpc } from "@/lib/trpc";
 
 export default function SettingsPage() {
   const { t } = useTranslations();
   const [isSignupDisabled, setIsSignupDisabled] = useState(false);
-  const [mcpResetTimeoutOnProgress, setMcpResetTimeoutOnProgress] = useState(false);
+  const [mcpResetTimeoutOnProgress, setMcpResetTimeoutOnProgress] =
+    useState(true);
   const [mcpTimeout, setMcpTimeout] = useState(60000);
   const [mcpMaxTotalTimeout, setMcpMaxTotalTimeout] = useState(60000);
 
@@ -63,12 +64,11 @@ export default function SettingsPage() {
       },
     });
 
-  const setMcpTimeoutMutation =
-    trpc.frontend.config.setMcpTimeout.useMutation({
-      onSuccess: () => {
-        refetchMcpTimeout();
-      },
-    });
+  const setMcpTimeoutMutation = trpc.frontend.config.setMcpTimeout.useMutation({
+    onSuccess: () => {
+      refetchMcpTimeout();
+    },
+  });
 
   const setMcpMaxTotalTimeoutMutation =
     trpc.frontend.config.setMcpMaxTotalTimeout.useMutation({
@@ -115,7 +115,9 @@ export default function SettingsPage() {
   const handleMcpResetTimeoutToggle = async (checked: boolean) => {
     setMcpResetTimeoutOnProgress(checked);
     try {
-      await setMcpResetTimeoutOnProgressMutation.mutateAsync({ enabled: checked });
+      await setMcpResetTimeoutOnProgressMutation.mutateAsync({
+        enabled: checked,
+      });
     } catch (error) {
       setMcpResetTimeoutOnProgress(!checked);
       console.error("Failed to update MCP reset timeout setting:", error);
@@ -125,7 +127,7 @@ export default function SettingsPage() {
   const handleMcpTimeoutChange = async (value: string) => {
     const timeout = parseInt(value, 10);
     if (isNaN(timeout) || timeout < 1000 || timeout > 300000) return;
-    
+
     setMcpTimeout(timeout);
     try {
       await setMcpTimeoutMutation.mutateAsync({ timeout });
@@ -138,7 +140,7 @@ export default function SettingsPage() {
   const handleMcpMaxTotalTimeoutChange = async (value: string) => {
     const timeout = parseInt(value, 10);
     if (isNaN(timeout) || timeout < 1000 || timeout > 300000) return;
-    
+
     setMcpMaxTotalTimeout(timeout);
     try {
       await setMcpMaxTotalTimeoutMutation.mutateAsync({ timeout });
@@ -148,7 +150,8 @@ export default function SettingsPage() {
     }
   };
 
-  const isLoading = signupLoading || mcpResetLoading || mcpTimeoutLoading || mcpMaxTotalLoading;
+  const isLoading =
+    signupLoading || mcpResetLoading || mcpTimeoutLoading || mcpMaxTotalLoading;
 
   if (isLoading) {
     return (
@@ -263,7 +266,9 @@ export default function SettingsPage() {
                   min="1000"
                   max="300000"
                   value={mcpMaxTotalTimeout}
-                  onChange={(e) => handleMcpMaxTotalTimeoutChange(e.target.value)}
+                  onChange={(e) =>
+                    handleMcpMaxTotalTimeoutChange(e.target.value)
+                  }
                   onBlur={(e) => handleMcpMaxTotalTimeoutChange(e.target.value)}
                   disabled={setMcpMaxTotalTimeoutMutation.isPending}
                   className="w-32"
