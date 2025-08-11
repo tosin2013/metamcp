@@ -73,6 +73,14 @@ export const ConfigUpdateInputSchema = z.object({
 export type ConfigCreateInput = z.infer<typeof ConfigCreateInputSchema>;
 export type ConfigUpdateInput = z.infer<typeof ConfigUpdateInputSchema>;
 
+// Settings form schema for frontend
+export const SettingsFormSchema = z.object({
+  mcpTimeout: z.number().int(),
+  mcpMaxTotalTimeout: z.number().int(),
+});
+
+export type SettingsFormData = z.infer<typeof SettingsFormSchema>;
+
 // Database-specific schemas (with Date objects)
 export const DatabaseConfigSchema = z.object({
   id: z.string(),

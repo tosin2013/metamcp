@@ -1,7 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { type SettingsFormData, SettingsFormSchema } from "@repo/zod-types";
+import React, { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,17 +25,30 @@ export default function SettingsPage() {
   const [isSignupDisabled, setIsSignupDisabled] = useState(false);
   const [mcpResetTimeoutOnProgress, setMcpResetTimeoutOnProgress] =
     useState(true);
-  const [mcpTimeout, setMcpTimeout] = useState(60000);
-  const [mcpMaxTotalTimeout, setMcpMaxTotalTimeout] = useState(60000);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Get current signup disabled status
+  // Form setup
+  const form = useForm<SettingsFormData>({
+    resolver: zodResolver(SettingsFormSchema),
+    defaultValues: {
+      mcpTimeout: 60000,
+      mcpMaxTotalTimeout: 60000,
+    },
+  });
+
+  const {
+    handleSubmit,
+    reset,
+    formState: { isDirty, isSubmitting },
+  } = form;
+
+  // Get current settings
   const {
     data: signupDisabled,
     isLoading: signupLoading,
     refetch: refetchSignup,
   } = trpc.frontend.config.getSignupDisabled.useQuery();
 
-  // Get current MCP timeout settings
   const {
     data: mcpResetTimeoutOnProgressData,
     isLoading: mcpResetLoading,
@@ -67,6 +85,7 @@ export default function SettingsPage() {
   const setMcpTimeoutMutation = trpc.frontend.config.setMcpTimeout.useMutation({
     onSuccess: () => {
       refetchMcpTimeout();
+      setHasUnsavedChanges(false);
     },
   });
 
@@ -74,41 +93,51 @@ export default function SettingsPage() {
     trpc.frontend.config.setMcpMaxTotalTimeout.useMutation({
       onSuccess: () => {
         refetchMcpMaxTotal();
+        setHasUnsavedChanges(false);
       },
     });
 
   // Update local state when data is loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (signupDisabled !== undefined) {
       setIsSignupDisabled(signupDisabled);
     }
   }, [signupDisabled]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (mcpResetTimeoutOnProgressData !== undefined) {
       setMcpResetTimeoutOnProgress(mcpResetTimeoutOnProgressData);
     }
   }, [mcpResetTimeoutOnProgressData]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (mcpTimeoutData !== undefined) {
-      setMcpTimeout(mcpTimeoutData);
+      form.setValue("mcpTimeout", mcpTimeoutData);
     }
-  }, [mcpTimeoutData]);
+  }, [mcpTimeoutData, form]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (mcpMaxTotalTimeoutData !== undefined) {
-      setMcpMaxTotalTimeout(mcpMaxTotalTimeoutData);
+      form.setValue("mcpMaxTotalTimeout", mcpMaxTotalTimeoutData);
     }
-  }, [mcpMaxTotalTimeoutData]);
+  }, [mcpMaxTotalTimeoutData, form]);
 
+  // Handle immediate switch updates
   const handleSignupToggle = async (checked: boolean) => {
     setIsSignupDisabled(checked);
     try {
       await setSignupDisabledMutation.mutateAsync({ disabled: checked });
+      toast.success(
+        checked
+          ? t("settings:signupDisabledSuccess")
+          : t("settings:signupEnabledSuccess"),
+      );
     } catch (error) {
       setIsSignupDisabled(!checked);
       console.error("Failed to update signup setting:", error);
+      toast.error(t("settings:signupToggleError"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -118,37 +147,43 @@ export default function SettingsPage() {
       await setMcpResetTimeoutOnProgressMutation.mutateAsync({
         enabled: checked,
       });
+      toast.success(
+        checked
+          ? t("settings:mcpResetTimeoutEnabledSuccess")
+          : t("settings:mcpResetTimeoutDisabledSuccess"),
+      );
     } catch (error) {
       setMcpResetTimeoutOnProgress(!checked);
       console.error("Failed to update MCP reset timeout setting:", error);
+      toast.error(t("settings:mcpResetTimeoutToggleError"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
-  const handleMcpTimeoutChange = async (value: string) => {
-    const timeout = parseInt(value, 10);
-    if (isNaN(timeout) || timeout < 1000 || timeout > 300000) return;
-
-    setMcpTimeout(timeout);
+  // Handle form submission
+  const onSubmit = async (data: SettingsFormData) => {
     try {
-      await setMcpTimeoutMutation.mutateAsync({ timeout });
+      await Promise.all([
+        setMcpTimeoutMutation.mutateAsync({ timeout: data.mcpTimeout }),
+        setMcpMaxTotalTimeoutMutation.mutateAsync({
+          timeout: data.mcpMaxTotalTimeout,
+        }),
+      ]);
+      reset(data); // Reset form state to match current values
+      toast.success(t("settings:saved"));
     } catch (error) {
-      setMcpTimeout(mcpTimeoutData || 60000);
-      console.error("Failed to update MCP timeout setting:", error);
+      console.error("Failed to save settings:", error);
+      toast.error(t("settings:error"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
-  const handleMcpMaxTotalTimeoutChange = async (value: string) => {
-    const timeout = parseInt(value, 10);
-    if (isNaN(timeout) || timeout < 1000 || timeout > 300000) return;
-
-    setMcpMaxTotalTimeout(timeout);
-    try {
-      await setMcpMaxTotalTimeoutMutation.mutateAsync({ timeout });
-    } catch (error) {
-      setMcpMaxTotalTimeout(mcpMaxTotalTimeoutData || 60000);
-      console.error("Failed to update MCP max total timeout setting:", error);
-    }
-  };
+  // Check for unsaved changes
+  useEffect(() => {
+    setHasUnsavedChanges(isDirty);
+  }, [isDirty]);
 
   const isLoading =
     signupLoading || mcpResetLoading || mcpTimeoutLoading || mcpMaxTotalLoading;
@@ -176,7 +211,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">{t("settings:description")}</p>
       </div>
 
-      <div className="grid gap-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>{t("settings:authSettings")}</CardTitle>
@@ -237,16 +272,23 @@ export default function SettingsPage() {
                 {t("settings:mcpTimeoutDescription")}
               </p>
               <div className="flex items-center space-x-2">
-                <Input
-                  id="mcp-timeout"
-                  type="number"
-                  min="1000"
-                  max="300000"
-                  value={mcpTimeout}
-                  onChange={(e) => handleMcpTimeoutChange(e.target.value)}
-                  onBlur={(e) => handleMcpTimeoutChange(e.target.value)}
-                  disabled={setMcpTimeoutMutation.isPending}
-                  className="w-32"
+                <Controller
+                  name="mcpTimeout"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      id="mcp-timeout"
+                      type="number"
+                      min="1000"
+                      max="3000000"
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value, 10);
+                        field.onChange(isNaN(value) ? 1000 : value);
+                      }}
+                      className="w-32"
+                    />
+                  )}
                 />
                 <span className="text-sm text-muted-foreground">ms</span>
               </div>
@@ -260,25 +302,49 @@ export default function SettingsPage() {
                 {t("settings:mcpMaxTotalTimeoutDescription")}
               </p>
               <div className="flex items-center space-x-2">
-                <Input
-                  id="mcp-max-total-timeout"
-                  type="number"
-                  min="1000"
-                  max="300000"
-                  value={mcpMaxTotalTimeout}
-                  onChange={(e) =>
-                    handleMcpMaxTotalTimeoutChange(e.target.value)
-                  }
-                  onBlur={(e) => handleMcpMaxTotalTimeoutChange(e.target.value)}
-                  disabled={setMcpMaxTotalTimeoutMutation.isPending}
-                  className="w-32"
+                <Controller
+                  name="mcpMaxTotalTimeout"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      id="mcp-max-total-timeout"
+                      type="number"
+                      min="1000"
+                      max="3000000"
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value, 10);
+                        field.onChange(isNaN(value) ? 1000 : value);
+                      }}
+                      className="w-32"
+                    />
+                  )}
                 />
                 <span className="text-sm text-muted-foreground">ms</span>
               </div>
             </div>
+
+            {/* Apply Changes Button - only show when there are unsaved changes */}
+            {hasUnsavedChanges && (
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                  {t("settings:unsavedChangesTitle")}
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="min-w-[120px]"
+                >
+                  {isSubmitting
+                    ? t("settings:loading")
+                    : t("settings:applyChanges")}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
-      </div>
+      </form>
     </div>
   );
 }
