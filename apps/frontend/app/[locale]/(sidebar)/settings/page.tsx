@@ -122,6 +122,16 @@ export default function SettingsPage() {
     }
   }, [mcpMaxTotalTimeoutData, form]);
 
+  // Reset form with loaded data to establish proper baseline for change detection
+  useEffect(() => {
+    if (mcpTimeoutData !== undefined && mcpMaxTotalTimeoutData !== undefined) {
+      form.reset({
+        mcpTimeout: mcpTimeoutData,
+        mcpMaxTotalTimeout: mcpMaxTotalTimeoutData,
+      });
+    }
+  }, [mcpTimeoutData, mcpMaxTotalTimeoutData, form]);
+
   // Handle immediate switch updates
   const handleSignupToggle = async (checked: boolean) => {
     setIsSignupDisabled(checked);
