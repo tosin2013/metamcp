@@ -282,9 +282,7 @@ export const createServer = async (
           params: {
             name: originalToolName,
             arguments: args || {},
-            _meta: {
-              progressToken: request.params._meta?.progressToken,
-            },
+            _meta: request.params._meta,
           },
         },
         CompatibilityCallToolResultSchema,
