@@ -3,11 +3,9 @@ import { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol";
 import {
   CallToolRequestSchema,
   CallToolResult,
-  CancelledNotificationSchema,
   CompatibilityCallToolResultSchema,
   GetPromptRequestSchema,
   GetPromptResultSchema,
-  InitializedNotificationSchema,
   ListPromptsRequestSchema,
   ListPromptsResultSchema,
   ListResourcesRequestSchema,
@@ -16,17 +14,10 @@ import {
   ListResourceTemplatesResultSchema,
   ListToolsRequestSchema,
   ListToolsResultSchema,
-  LoggingMessageNotificationSchema,
-  ProgressNotificationSchema,
-  PromptListChangedNotificationSchema,
   ReadResourceRequestSchema,
   ReadResourceResultSchema,
-  ResourceListChangedNotificationSchema,
   ResourceTemplate,
-  ResourceUpdatedNotificationSchema,
-  RootsListChangedNotificationSchema,
   Tool,
-  ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
@@ -57,9 +48,6 @@ export const createServer = async (
   const promptToClient: Record<string, ConnectedClient> = {};
   const resourceToClient: Record<string, ConnectedClient> = {};
 
-  // Track which servers already have notification handlers set up
-  const serversWithNotificationHandlers = new Set<string>();
-
   const server = new Server(
     {
       name: "metamcp-unified",
@@ -70,8 +58,6 @@ export const createServer = async (
         prompts: {},
         resources: {},
         tools: {},
-        notifications: { subscribe: true },
-        logging: { subscribe: true },
       },
     },
   );
@@ -104,13 +90,6 @@ export const createServer = async (
 
         const capabilities = session.client.getServerCapabilities();
         if (!capabilities?.tools) return;
-
-        // Set up notification handlers for this sub MCP server
-        // This allows MetaMCP to receive notifications from the sub MCP server
-        setupSubMcpServerNotificationHandlers(
-          session,
-          params.name || session.client.getServerVersion()?.name || "unknown",
-        );
 
         // Use name assigned by user, fallback to name from server
         const serverName =
@@ -162,77 +141,6 @@ export const createServer = async (
     );
 
     return { tools: allTools };
-  };
-
-  // Function to set up notification handlers for sub MCP servers
-  const setupSubMcpServerNotificationHandlers = (
-    session: ConnectedClient,
-    serverName: string,
-  ) => {
-    // Check if notification handlers are already set up for this server
-    if (serversWithNotificationHandlers.has(serverName)) {
-      return; // Already set up
-    }
-
-    // Set up handlers for various notification types from the sub MCP server
-    const notificationSchemas = [
-      CancelledNotificationSchema,
-      InitializedNotificationSchema,
-      LoggingMessageNotificationSchema,
-      ProgressNotificationSchema,
-      PromptListChangedNotificationSchema,
-      ResourceListChangedNotificationSchema,
-      ResourceUpdatedNotificationSchema,
-      RootsListChangedNotificationSchema,
-      ToolListChangedNotificationSchema,
-    ];
-
-    notificationSchemas.forEach((schema) => {
-      session.client.setNotificationHandler(schema, async (notification) => {
-        console.log(
-          `Received ${notification.method} notification from sub MCP server: ${serverName}`,
-        );
-
-        // Forward the notification to the MetaMCP server so it can be sent to clients
-        try {
-          await server.notification(notification);
-          console.log(
-            `Successfully forwarded ${notification.method} notification from ${serverName} to MetaMCP server`,
-          );
-        } catch (error) {
-          console.error(
-            `Error forwarding notification from ${serverName} to MetaMCP server:`,
-            error,
-          );
-        }
-      });
-    });
-
-    // Set up a fallback handler for any unhandled notification types
-    session.client.fallbackNotificationHandler = async (notification) => {
-      console.log(
-        `Received unhandled notification ${notification.method} from sub MCP server: ${serverName}`,
-      );
-
-      // Forward the notification to the MetaMCP server so it can be sent to clients
-      try {
-        await server.notification(notification);
-        console.log(
-          `Successfully forwarded unhandled notification ${notification.method} from ${serverName} to MetaMCP server`,
-        );
-      } catch (error) {
-        console.error(
-          `Error forwarding unhandled notification from ${serverName} to MetaMCP server:`,
-          error,
-        );
-      }
-    };
-
-    // Mark this server as having notification handlers set up
-    serversWithNotificationHandlers.add(serverName);
-    console.log(
-      `Set up notification handlers for sub MCP server: ${serverName}`,
-    );
   };
 
   // Original Call Tool Handler
@@ -389,12 +297,6 @@ export const createServer = async (
         const capabilities = session.client.getServerCapabilities();
         if (!capabilities?.prompts) return;
 
-        // Set up notification handlers for this sub MCP server if not already done
-        setupSubMcpServerNotificationHandlers(
-          session,
-          params.name || session.client.getServerVersion()?.name || "",
-        );
-
         // Use name assigned by user, fallback to name from server
         const serverName =
           params.name || session.client.getServerVersion()?.name || "";
@@ -450,12 +352,6 @@ export const createServer = async (
 
         const capabilities = session.client.getServerCapabilities();
         if (!capabilities?.resources) return;
-
-        // Set up notification handlers for this sub MCP server if not already done
-        setupSubMcpServerNotificationHandlers(
-          session,
-          params.name || session.client.getServerVersion()?.name || "",
-        );
 
         // Use name assigned by user, fallback to name from server
         const serverName =
@@ -591,8 +487,6 @@ export const createServer = async (
   const cleanup = async () => {
     // Cleanup is now handled by the pool
     await mcpServerPool.cleanupSession(sessionId);
-    // Cleanup notification handlers tracking
-    serversWithNotificationHandlers.clear();
   };
 
   return { server, cleanup };
