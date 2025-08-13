@@ -134,8 +134,12 @@ export class ProcessManagedStdioTransport implements Transport {
           signal: this._abortController.signal,
           windowsHide: process.platform === "win32" && isElectron(),
           cwd: this._serverParams.cwd,
+          detached: true,
         },
       );
+
+      // Unref the child process so it doesn't keep the parent alive
+      this._process.unref();
 
       this._process.on("error", (error) => {
         if (error.name === "AbortError") {
@@ -217,6 +221,17 @@ export class ProcessManagedStdioTransport implements Transport {
 
   async close(): Promise<void> {
     this._abortController.abort();
+
+    // Kill the entire process group to ensure full cleanup
+    if (this._process?.pid) {
+      try {
+        process.kill(-this._process.pid, "SIGTERM");
+      } catch (error) {
+        // Process might already be terminated, ignore errors
+        console.warn("Failed to kill process group:", error);
+      }
+    }
+
     this._process = undefined;
     this._readBuffer.clear();
   }
