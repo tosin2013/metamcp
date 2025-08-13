@@ -1,7 +1,7 @@
 # Development Dockerfile with hot reload support
 FROM ghcr.io/astral-sh/uv:debian AS base
 
-# Install Node.js and pnpm
+# Install Node.js, pnpm, and Tini
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -14,6 +14,11 @@ RUN apt-get update && apt-get install -y \
 # Install Docker CLI for container management
 RUN apt-get update && apt-get install -y \
     docker.io \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Tini for proper signal handling and zombie process cleanup
+RUN apt-get update && apt-get install -y tini \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -55,6 +60,9 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 COPY docker-entrypoint-dev.sh ./
 RUN chmod +x docker-entrypoint-dev.sh && \
     ls -la docker-entrypoint-dev.sh
+
+# Use Tini as the init process to handle signals and zombie processes properly
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Use the development entrypoint script
 CMD ["./docker-entrypoint-dev.sh"] 
