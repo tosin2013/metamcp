@@ -2,7 +2,10 @@
 
 set -e
 
-echo "Starting MetaMCP development services..."
+echo "🚀 Starting MetaMCP development services..."
+echo "📁 Working directory: $(pwd)"
+echo "🔍 Node version: $(node --version)"
+echo "📦 pnpm version: $(pnpm --version)"
 
 # Function to cleanup on exit
 cleanup_on_exit() {
@@ -30,12 +33,18 @@ cleanup_on_exit() {
 # Setup cleanup trap for multiple signals
 trap cleanup_on_exit TERM INT EXIT
 
-echo "Starting development servers with turborepo..."
-echo "Backend will run on port 12009"
-echo "Frontend will run on port 12008"
+echo "🔧 Setting up development environment..."
+echo "📊 Backend will run on port 12009"
+echo "🌐 Frontend will run on port 12008"
+echo "🔄 Hot reloading is enabled for both frontend and backend"
+
+# Ensure dependencies are up to date
+echo "📦 Checking dependencies..."
+pnpm install
 
 # Start the development servers with proper signal handling
-echo "🚀 Starting pnpm dev..."
+echo "🚀 Starting pnpm dev with turborepo..."
+echo "💡 This will start both frontend and backend in development mode"
 pnpm dev &
 PNPM_PID=$!
 echo "🚀 pnpm dev started with PID: $PNPM_PID"

@@ -23,6 +23,8 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV=development
+ENV WATCHPACK_POLLING=true
+ENV CHOKIDAR_USEPOLLING=true
 
 # Copy package files for dependency installation
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -39,8 +41,8 @@ COPY packages/zod-types/package.json ./packages/zod-types/
 # Install all dependencies (including dev dependencies)
 RUN pnpm install
 
-# Copy source code (will be overridden by volume mount in dev)
-COPY . .
+# Create necessary directories for volume mounts
+RUN mkdir -p apps/frontend apps/backend packages/trpc packages/zod-types packages/eslint-config packages/typescript-config
 
 # Expose ports
 EXPOSE 12008 12009
