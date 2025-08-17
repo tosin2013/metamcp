@@ -56,21 +56,27 @@ RUN sed -i -e "s/30000/600000/" \
 FROM base AS runner
 WORKDIR /app
 
-# OCI image labels
+# OCI image labels (compatible with both Docker and Podman)
 LABEL org.opencontainers.image.source="https://github.com/metatool-ai/metamcp"
 LABEL org.opencontainers.image.description="MetaMCP - aggregates MCP servers into a unified MetaMCP"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.title="MetaMCP"
 LABEL org.opencontainers.image.vendor="metatool-ai"
+LABEL org.opencontainers.image.documentation="https://docs.metamcp.com"
+LABEL io.containers.capabilities="NET_BIND_SERVICE,SETUID,SETGID"
 
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl postgresql-client && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user with proper home directory
+# Create non-root user with proper home directory (Docker & Podman compatible)
+# Use consistent UID/GID that works with both Docker and rootless Podman
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 --home /home/nextjs nextjs && \
     mkdir -p /home/nextjs/.cache/node/corepack && \
-    chown -R nextjs:nodejs /home/nextjs
+    mkdir -p /home/nextjs/.local/share && \
+    chown -R nextjs:nodejs /home/nextjs && \
+    # Ensure the user can write to necessary directories for both runtimes
+    chmod 755 /home/nextjs
 
 # Copy built applications
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next ./apps/frontend/.next

@@ -1,0 +1,78 @@
+services:
+  app:
+    container_name: metamcp
+    image: ghcr.io/metatool-ai/metamcp:latest
+    pull_policy: always
+    env_file:
+      - .env
+    ports:
+      - "12008:12008"
+    environment:
+      # Postgres connection details
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-metamcp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-m3t4mcp}
+      POSTGRES_DB: ${POSTGRES_DB:-metamcp_db}
+      
+      # Database configuration (composed from above vars)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-metamcp_user}:${POSTGRES_PASSWORD:-m3t4mcp}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-metamcp_db}
+      
+      # Application URL configuration
+      APP_URL: ${APP_URL:-http://localhost:12008}
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:12008}
+      
+      # Auth configuration
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-your-super-secret-key-change-this-in-production}
+      
+      # Podman networking configuration
+      TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL: ${TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL:-false}
+    # Podman uses host networking differently - use host.containers.internal instead
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - metamcp-network
+    # Podman-specific security context
+    security_opt:
+      - "label=type:container_runtime_t"
+    # Ensure proper user namespace mapping for rootless podman
+    userns_mode: "keep-id"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: metamcp-pg
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-metamcp_db}
+      POSTGRES_USER: ${POSTGRES_USER:-metamcp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-m3t4mcp}
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT:-9433}:5432"
+    volumes:
+      # Use Z flag for SELinux compatibility on RHEL systems
+      - postgres_data:/var/lib/postgresql/data:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-metamcp_user} -d ${POSTGRES_DB:-metamcp_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - metamcp-network
+    # Podman-specific security context for PostgreSQL
+    security_opt:
+      - "label=type:container_runtime_t"
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  metamcp-network:
+    driver: bridge

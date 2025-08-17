@@ -110,22 +110,52 @@ Similar to the official MCP inspector, but with **saved server configs** - MetaM
 
 ## 🚀 Quick Start
 
-### **🐳 Run with Docker Compose (Recommended)**
+### **🐳 Run with Docker Compose**
 
-Clone repo, prepare `.env`, and start with docker compose:
+Clone repo, prepare `.env`, and start with Docker:
 
 ```bash
 git clone https://github.com/metatool-ai/metamcp.git
 cd metamcp
+./setup-docker.sh
+```
+
+Or manually:
+```bash
 cp example.env .env
 docker compose up -d
 ```
 
+### **🦭 Run with Podman (RHEL/Fedora Recommended)**
+
+For RHEL, Rocky Linux, Fedora, or other Red Hat-based systems:
+
+```bash
+git clone https://github.com/metatool-ai/metamcp.git
+cd metamcp
+./setup-podman.sh
+```
+
+Or manually:
+```bash
+cp example.env .env
+# Edit .env to set TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL=false for Podman
+podman-compose -f podman-compose.yml up -d
+```
+
+**Podman Benefits on RHEL:**
+- 🔒 Rootless containers (enhanced security)
+- 🚫 No daemon required (systemd integration)
+- 🛡️ Better SELinux integration
+- 📦 Native to Red Hat ecosystem
+
+### **Container Runtime Notes**
+
 If you modify APP_URL env vars, make sure you only access from the APP_URL, because MetaMCP enforces CORS policy on the URL, so no other URL is accessible.
 
-Note that the pg volume name may collide with your other pg dockers, which is global, consider rename it in `docker-compose.yml`:
+Note that the pg volume name may collide with your other containers, consider renaming it in the compose files:
 
-```
+```yaml
 volumes:
   metamcp_postgres_data:
     driver: local
@@ -133,7 +163,7 @@ volumes:
 
 ### **💻 Local Development**
 
-Still recommend running postgres through docker for easy setup:
+Still recommend running postgres through containers for easy setup:
 
 ```bash
 pnpm install
