@@ -167,15 +167,24 @@ setup_yq() {
         yq --version
     else
         print_warning "yq not found. Installing yq for YAML processing..."
-        curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq
-        sudo mv /tmp/yq /usr/local/bin/yq
-        sudo chmod +x /usr/local/bin/yq
         
-        if command -v yq &> /dev/null; then
-            print_status "yq installed successfully at $(which yq)"
-            yq --version
+        # Try to install to user directory first, then system-wide
+        if curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq; then
+            # Try user installation first
+            if mkdir -p "$HOME/.local/bin" && mv /tmp/yq "$HOME/.local/bin/yq" && chmod +x "$HOME/.local/bin/yq"; then
+                export PATH="$HOME/.local/bin:$PATH"
+                print_status "yq installed successfully to user directory at $HOME/.local/bin/yq"
+                yq --version
+            elif command -v sudo &> /dev/null && sudo mv "$HOME/.local/bin/yq" /usr/local/bin/yq 2>/dev/null; then
+                print_status "yq installed successfully to system directory at /usr/local/bin/yq"
+                yq --version
+            else
+                print_warning "yq downloaded but installation failed. You may need to manually install it."
+                print_info "Try: chmod +x /tmp/yq && mv /tmp/yq \$HOME/.local/bin/yq"
+                rm -f /tmp/yq "$HOME/.local/bin/yq" 2>/dev/null || true
+            fi
         else
-            print_warning "yq installation failed. Path management script may not work properly."
+            print_warning "Failed to download yq. Path management script may not work properly."
         fi
     fi
 }
@@ -321,8 +330,13 @@ start_services() {
     echo "🗄️  PostgreSQL available at: localhost:9433"
     echo ""
     echo "Podman commands:"
-    echo "  View logs: podman-compose -f podman-compose.yml logs -f"
-    echo "  Stop services: podman-compose -f podman-compose.yml down"
+    if [[ -n "$PODMAN_COMPOSE_CMD" ]]; then
+        echo "  View logs: $PODMAN_COMPOSE_CMD -f podman-compose.yml logs -f"
+        echo "  Stop services: $PODMAN_COMPOSE_CMD -f podman-compose.yml down"
+    else
+        echo "  View logs: podman-compose -f podman-compose.yml logs -f"
+        echo "  Stop services: podman-compose -f podman-compose.yml down"
+    fi
     echo "  List containers: podman ps"
     echo "  View pod: podman pod ls"
 }
