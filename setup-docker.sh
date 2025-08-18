@@ -62,6 +62,32 @@ check_docker_daemon() {
     fi
 }
 
+# Check and install uv for Python MCP servers
+setup_uv() {
+    # Add common uv installation paths to PATH
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    
+    if command -v uvx &> /dev/null; then
+        print_status "uv is already installed at $(which uvx)"
+        uv --version
+    else
+        print_warning "uv not found. Installing uv for Python MCP server support..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        
+        # Reload PATH after installation
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        source $HOME/.cargo/env 2>/dev/null || true
+        
+        if command -v uvx &> /dev/null; then
+            print_status "uv installed successfully at $(which uvx)"
+            uv --version
+        else
+            print_warning "uv installation may require shell restart. Run 'source ~/.bashrc' or restart terminal."
+            print_info "You can also manually add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
+        fi
+    fi
+}
+
 # Set up environment file
 setup_env() {
     if [[ ! -f .env ]]; then
@@ -105,6 +131,10 @@ main() {
     check_docker
     check_docker_compose
     check_docker_daemon
+    
+    echo ""
+    echo "Setting up Python MCP server support..."
+    setup_uv
     
     echo ""
     echo "Setting up environment..."

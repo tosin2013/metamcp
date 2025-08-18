@@ -134,6 +134,52 @@ check_podman_config() {
     fi
 }
 
+# Check and install uv for Python MCP servers
+setup_uv() {
+    # Add common uv installation paths to PATH
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    
+    if command -v uvx &> /dev/null; then
+        print_status "uv is already installed at $(which uvx)"
+        uv --version
+    else
+        print_warning "uv not found. Installing uv for Python MCP server support..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        
+        # Reload PATH after installation
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        source $HOME/.cargo/env 2>/dev/null || true
+        
+        if command -v uvx &> /dev/null; then
+            print_status "uv installed successfully at $(which uvx)"
+            uv --version
+        else
+            print_warning "uv installation may require shell restart. Run 'source ~/.bashrc' or restart terminal."
+            print_info "You can also manually add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
+        fi
+    fi
+}
+
+# Check and install yq for YAML processing
+setup_yq() {
+    if command -v yq &> /dev/null; then
+        print_status "yq is already installed at $(which yq)"
+        yq --version
+    else
+        print_warning "yq not found. Installing yq for YAML processing..."
+        curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq
+        sudo mv /tmp/yq /usr/local/bin/yq
+        sudo chmod +x /usr/local/bin/yq
+        
+        if command -v yq &> /dev/null; then
+            print_status "yq installed successfully at $(which yq)"
+            yq --version
+        else
+            print_warning "yq installation failed. Path management script may not work properly."
+        fi
+    fi
+}
+
 # Set up environment file
 setup_env() {
     if [[ ! -f .env ]]; then
@@ -162,13 +208,24 @@ configure_selinux() {
     if command -v getenforce &> /dev/null; then
         selinux_status=$(getenforce)
         if [[ "$selinux_status" == "Enforcing" ]]; then
-            print_status "SELinux is enforcing - using Z volume flags in podman-compose.yml"
-            print_info "Podman-compose.yml is already configured with SELinux-compatible volume flags"
+            print_status "SELinux is enforcing - volume mounts will use :Z flags"
+            print_info "Path management is handled by manage-paths.sh script"
         elif [[ "$selinux_status" == "Permissive" ]]; then
             print_warning "SELinux is in permissive mode"
         else
             print_status "SELinux is disabled"
         fi
+    fi
+}
+
+# Initialize path management system
+init_path_management() {
+    if [[ -f manage-paths.sh ]]; then
+        chmod +x manage-paths.sh
+        ./manage-paths.sh init
+        print_status "Initialized project path management system"
+    else
+        print_warning "manage-paths.sh not found. Path management will need to be set up manually."
     fi
 }
 
@@ -212,6 +269,9 @@ start_services_podman_run() {
     print_info "Waiting for PostgreSQL to start..."
     sleep 10
     
+    # Get current directory for volume mount
+    current_dir=$(pwd)
+    
     # Start MetaMCP application
     print_info "Starting MetaMCP application container..."
     podman run -d \
@@ -229,6 +289,7 @@ start_services_podman_run() {
         -e BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
         -e TRANSFORM_LOCALHOST_TO_DOCKER_INTERNAL=false \
         --add-host="host.containers.internal:host-gateway" \
+        -v "${current_dir}:${current_dir}:Z" \
         ghcr.io/metatool-ai/metamcp:latest
     
     print_status "MetaMCP services started successfully with Podman!"
@@ -276,9 +337,15 @@ main() {
     check_podman_config
     echo ""
     
+    echo "Setting up development tools..."
+    setup_uv
+    setup_yq
+    echo ""
+    
     echo "Setting up environment..."
     setup_env
     configure_selinux
+    init_path_management
     
     echo ""
     if [[ "$USE_PODMAN_RUN" == "true" ]]; then
@@ -291,7 +358,46 @@ main() {
     echo "🎉 MetaMCP is now running with Podman!"
     echo "This configuration is optimized for RHEL/Fedora systems."
     echo "Visit the URL above to get started."
+    echo ""
+    echo "📁 Project Path Management:"
+    echo "  Use ./manage-paths.sh to manage directories that MCP servers can access:"
+    echo "  Add project: ./manage-paths.sh add /path/to/project"
+    echo "  Remove project: ./manage-paths.sh remove /path/to/project" 
+    echo "  List projects: ./manage-paths.sh list"
+    echo "  Help: ./manage-paths.sh help"
 }
 
-# Run main function
-main "$@"
+# Show usage
+show_help() {
+    echo "MetaMCP Podman Setup Script"
+    echo ""
+    echo "Usage:"
+    echo "  $0                    Setup and start MetaMCP (default)"
+    echo "  $0 --podman-run       Use podman run instead of compose"
+    echo "  $0 --help             Show this help message"
+    echo ""
+    echo "This script will:"
+    echo "  - Check system requirements (Podman, uv, yq)"
+    echo "  - Set up environment configuration"
+    echo "  - Initialize path management system"  
+    echo "  - Start MetaMCP services"
+    echo ""
+}
+
+# Handle command line arguments
+case "${1:-setup}" in
+    "setup"|"")
+        main "$@"
+        ;;
+    "--podman-run")
+        main "$@"
+        ;;
+    "--help"|"-h"|"help")
+        show_help
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+esac
