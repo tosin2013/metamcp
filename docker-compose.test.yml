@@ -1,24 +1,14 @@
 services:
   app:
-    container_name: metamcp-dev
+    container_name: metamcp
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+    pull_policy: always
     env_file:
       - .env
     ports:
       - "12008:12008"
-      - "12009:12009"
-    volumes:
-      # Mount source code for hot reloading
-      - .:/app
-      - /app/node_modules
-      - /app/apps/frontend/node_modules
-      - /app/apps/backend/node_modules
-      - /app/packages/trpc/node_modules
-      - /app/packages/zod-types/node_modules
-      - /app/packages/eslint-config/node_modules
-      - /app/packages/typescript-config/node_modules
     environment:
       # Postgres connection details
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -50,7 +40,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: metamcp-pg-dev
+    container_name: metamcp-pg
     restart: unless-stopped
     env_file:
       - .env
@@ -61,7 +51,7 @@ services:
     ports:
       - "${POSTGRES_EXTERNAL_PORT:-9433}:5432"
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-metamcp_user} -d ${POSTGRES_DB:-metamcp_db}"]
       interval: 10s
@@ -72,9 +62,9 @@ services:
       - metamcp-network
 
 volumes:
-  postgres_data_dev:
+  postgres_data:
     driver: local
 
 networks:
   metamcp-network:
-    driver: bridge 
+    driver: bridge
