@@ -48,9 +48,26 @@ export const createServer = async (
   const promptToClient: Record<string, ConnectedClient> = {};
   const resourceToClient: Record<string, ConnectedClient> = {};
 
+  // Track visited servers to detect circular references
+  const visitedServers = new Set<string>();
+
+  // Helper function to detect if a server is the same instance
+  const isSameServerInstance = (
+    params: { name?: string; url?: string | null },
+    _serverUuid: string,
+  ): boolean => {
+    // Check if server name is exactly the same as our current server instance
+    // This prevents exact recursive calls to the same server
+    if (params.name === `metamcp-unified-${namespaceUuid}`) {
+      return true;
+    }
+
+    return false;
+  };
+
   const server = new Server(
     {
-      name: "metamcp-unified",
+      name: `metamcp-unified-${namespaceUuid}`,
       version: "1.0.0",
     },
     {
@@ -79,8 +96,15 @@ export const createServer = async (
     );
     const allTools: Tool[] = [];
 
+    // We'll filter servers during processing after getting sessions to check actual MCP server names
+    const allServerEntries = Object.entries(serverParams);
+
     await Promise.allSettled(
-      Object.entries(serverParams).map(async ([mcpServerUuid, params]) => {
+      allServerEntries.map(async ([mcpServerUuid, params]) => {
+        // Skip if we've already visited this server to prevent circular references
+        if (visitedServers.has(mcpServerUuid)) {
+          return;
+        }
         const session = await mcpServerPool.getSession(
           context.sessionId,
           mcpServerUuid,
@@ -88,12 +112,33 @@ export const createServer = async (
         );
         if (!session) return;
 
+        // Now check for self-referencing using the actual MCP server name
+        const serverVersion = session.client.getServerVersion();
+        const actualServerName = serverVersion?.name || params.name || "";
+        const ourServerName = `metamcp-unified-${namespaceUuid}`;
+
+        if (actualServerName === ourServerName) {
+          console.log(
+            `Skipping self-referencing MetaMCP server: "${actualServerName}"`,
+          );
+          return;
+        }
+
+        // Check basic self-reference patterns
+        if (isSameServerInstance(params, mcpServerUuid)) {
+          return;
+        }
+
+        // Mark this server as visited
+        visitedServers.add(mcpServerUuid);
+
         const capabilities = session.client.getServerCapabilities();
         if (!capabilities?.tools) return;
 
         // Use name assigned by user, fallback to name from server
         const serverName =
           params.name || session.client.getServerVersion()?.name || "";
+
         try {
           const result = await session.client.request(
             {
@@ -110,9 +155,6 @@ export const createServer = async (
                 tools: result.tools,
                 mcpServerUuid: mcpServerUuid,
               });
-              console.log(
-                `Saved ${result.tools.length} tools for server: ${serverName}`,
-              );
             } catch (dbError) {
               console.error(
                 `Error saving tools to database for server ${serverName}:`,
@@ -126,6 +168,7 @@ export const createServer = async (
               const toolName = `${sanitizeName(serverName)}__${tool.name}`;
               toolToClient[toolName] = session;
               toolToServerUuid[toolName] = mcpServerUuid;
+
               return {
                 ...tool,
                 name: toolName,
@@ -289,10 +332,47 @@ export const createServer = async (
     );
     const allPrompts: z.infer<typeof ListPromptsResultSchema>["prompts"] = [];
 
+    // Filter out self-referencing servers before processing
+    const validPromptServers = Object.entries(serverParams).filter(
+      ([uuid, params]) => {
+        // Skip if we've already visited this server to prevent circular references
+        if (visitedServers.has(uuid)) {
+          console.log(
+            `Skipping already visited server in prompts: ${params.name || uuid}`,
+          );
+          return false;
+        }
+
+        // Check if this server is the same instance to prevent self-referencing
+        if (isSameServerInstance(params, uuid)) {
+          console.log(
+            `Skipping self-referencing server in prompts: ${params.name || uuid}`,
+          );
+          return false;
+        }
+
+        // Mark this server as visited
+        visitedServers.add(uuid);
+        return true;
+      },
+    );
+
     await Promise.allSettled(
-      Object.entries(serverParams).map(async ([uuid, params]) => {
+      validPromptServers.map(async ([uuid, params]) => {
         const session = await mcpServerPool.getSession(sessionId, uuid, params);
         if (!session) return;
+
+        // Now check for self-referencing using the actual MCP server name
+        const serverVersion = session.client.getServerVersion();
+        const actualServerName = serverVersion?.name || params.name || "";
+        const ourServerName = `metamcp-unified-${namespaceUuid}`;
+
+        if (actualServerName === ourServerName) {
+          console.log(
+            `Skipping self-referencing MetaMCP server in prompts: "${actualServerName}"`,
+          );
+          return;
+        }
 
         const capabilities = session.client.getServerCapabilities();
         if (!capabilities?.prompts) return;
@@ -345,10 +425,47 @@ export const createServer = async (
     const allResources: z.infer<typeof ListResourcesResultSchema>["resources"] =
       [];
 
+    // Filter out self-referencing servers before processing
+    const validResourceServers = Object.entries(serverParams).filter(
+      ([uuid, params]) => {
+        // Skip if we've already visited this server to prevent circular references
+        if (visitedServers.has(uuid)) {
+          console.log(
+            `Skipping already visited server in resources: ${params.name || uuid}`,
+          );
+          return false;
+        }
+
+        // Check if this server is the same instance to prevent self-referencing
+        if (isSameServerInstance(params, uuid)) {
+          console.log(
+            `Skipping self-referencing server in resources: ${params.name || uuid}`,
+          );
+          return false;
+        }
+
+        // Mark this server as visited
+        visitedServers.add(uuid);
+        return true;
+      },
+    );
+
     await Promise.allSettled(
-      Object.entries(serverParams).map(async ([uuid, params]) => {
+      validResourceServers.map(async ([uuid, params]) => {
         const session = await mcpServerPool.getSession(sessionId, uuid, params);
         if (!session) return;
+
+        // Now check for self-referencing using the actual MCP server name
+        const serverVersion = session.client.getServerVersion();
+        const actualServerName = serverVersion?.name || params.name || "";
+        const ourServerName = `metamcp-unified-${namespaceUuid}`;
+
+        if (actualServerName === ourServerName) {
+          console.log(
+            `Skipping self-referencing MetaMCP server in resources: "${actualServerName}"`,
+          );
+          return;
+        }
 
         const capabilities = session.client.getServerCapabilities();
         if (!capabilities?.resources) return;
@@ -431,14 +548,51 @@ export const createServer = async (
       );
       const allTemplates: ResourceTemplate[] = [];
 
+      // Filter out self-referencing servers before processing
+      const validTemplateServers = Object.entries(serverParams).filter(
+        ([uuid, params]) => {
+          // Skip if we've already visited this server to prevent circular references
+          if (visitedServers.has(uuid)) {
+            console.log(
+              `Skipping already visited server in resource templates: ${params.name || uuid}`,
+            );
+            return false;
+          }
+
+          // Check if this server is the same instance to prevent self-referencing
+          if (isSameServerInstance(params, uuid)) {
+            console.log(
+              `Skipping self-referencing server in resource templates: ${params.name || uuid}`,
+            );
+            return false;
+          }
+
+          // Mark this server as visited
+          visitedServers.add(uuid);
+          return true;
+        },
+      );
+
       await Promise.allSettled(
-        Object.entries(serverParams).map(async ([uuid, params]) => {
+        validTemplateServers.map(async ([uuid, params]) => {
           const session = await mcpServerPool.getSession(
             sessionId,
             uuid,
             params,
           );
           if (!session) return;
+
+          // Now check for self-referencing using the actual MCP server name
+          const serverVersion = session.client.getServerVersion();
+          const actualServerName = serverVersion?.name || params.name || "";
+          const ourServerName = `metamcp-unified-${namespaceUuid}`;
+
+          if (actualServerName === ourServerName) {
+            console.log(
+              `Skipping self-referencing MetaMCP server in resource templates: "${actualServerName}"`,
+            );
+            return;
+          }
 
           const capabilities = session.client.getServerCapabilities();
           if (!capabilities?.resources) return;

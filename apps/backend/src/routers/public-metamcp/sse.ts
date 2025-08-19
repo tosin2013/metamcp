@@ -18,15 +18,33 @@ const webAppTransports: Map<string, Transport> = new Map<string, Transport>(); /
 const cleanupSession = async (sessionId: string) => {
   console.log(`Cleaning up SSE session ${sessionId}`);
 
-  // Clean up transport
-  const transport = webAppTransports.get(sessionId);
-  if (transport) {
-    webAppTransports.delete(sessionId);
-    await transport.close();
-  }
+  try {
+    // Clean up transport
+    const transport = webAppTransports.get(sessionId);
+    if (transport) {
+      console.log(`Closing transport for session ${sessionId}`);
+      await transport.close();
+      webAppTransports.delete(sessionId);
+      console.log(`Transport cleaned up for session ${sessionId}`);
+    } else {
+      console.log(`No transport found for session ${sessionId}`);
+    }
 
-  // Clean up MetaMCP server pool session
-  await metaMcpServerPool.cleanupSession(sessionId);
+    // Clean up MetaMCP server pool session
+    await metaMcpServerPool.cleanupSession(sessionId);
+
+    console.log(`Session ${sessionId} cleanup completed successfully`);
+  } catch (error) {
+    console.error(`Error during cleanup of session ${sessionId}:`, error);
+    // Even if cleanup fails, remove the transport from our map to prevent memory leaks
+    if (webAppTransports.has(sessionId)) {
+      webAppTransports.delete(sessionId);
+      console.log(
+        `Removed orphaned transport for session ${sessionId} due to cleanup error`,
+      );
+    }
+    throw error;
+  }
 };
 
 sseRouter.get(

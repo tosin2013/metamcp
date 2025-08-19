@@ -4,10 +4,7 @@ import {
   SSEClientTransport,
   SseError,
 } from "@modelcontextprotocol/sdk/client/sse.js";
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
+import { getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -19,6 +16,7 @@ import { findActualExecutable } from "spawn-rx";
 
 import mcpProxy from "../../lib/mcp-proxy";
 import { transformDockerUrl } from "../../lib/metamcp/client";
+import { ProcessManagedStdioTransport } from "../../lib/stdio-transport/process-managed-transport";
 import { betterAuthMcpMiddleware } from "../../middleware/better-auth-mcp.middleware";
 
 const SSE_HEADERS_PASSTHROUGH = ["authorization"];
@@ -182,7 +180,7 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
 
     console.log(`STDIO transport: command=${cmd}, args=${args}`);
 
-    const transport = new StdioClientTransport({
+    const transport = new ProcessManagedStdioTransport({
       command: cmd,
       args,
       env,
@@ -431,7 +429,7 @@ serverRouter.get("/stdio", async (req, res) => {
 
     await webAppTransport.start();
 
-    const stdinTransport = serverTransport as StdioClientTransport;
+    const stdinTransport = serverTransport as ProcessManagedStdioTransport;
 
     // Monitor for quick failures and set cooldown
     const commandStartTime = Date.now();
@@ -457,7 +455,7 @@ serverRouter.get("/stdio", async (req, res) => {
     };
 
     if (stdinTransport.stderr) {
-      stdinTransport.stderr.on("data", (chunk) => {
+      stdinTransport.stderr.on("data", (chunk: Buffer) => {
         const errorContent = chunk.toString();
         if (errorContent.includes("MODULE_NOT_FOUND")) {
           webAppTransport

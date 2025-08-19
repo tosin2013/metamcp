@@ -1,11 +1,24 @@
 services:
   app:
     container_name: metamcp-dev
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     env_file:
       - .env
     ports:
       - "12008:12008"
+      - "12009:12009"
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      - /app/node_modules
+      - /app/apps/frontend/node_modules
+      - /app/apps/backend/node_modules
+      - /app/packages/trpc/node_modules
+      - /app/packages/zod-types/node_modules
+      - /app/packages/eslint-config/node_modules
+      - /app/packages/typescript-config/node_modules
     environment:
       # Postgres connection details
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}

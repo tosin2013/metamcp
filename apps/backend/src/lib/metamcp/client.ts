@@ -1,13 +1,11 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import {
-  StdioClientTransport,
-  StdioServerParameters,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { ServerParameters } from "@repo/zod-types";
 
+import { ProcessManagedStdioTransport } from "../stdio-transport/process-managed-transport";
 import { metamcpLogStore } from "./log-store";
 
 const sleep = (time: number) =>
@@ -45,11 +43,11 @@ export const createMetaMcpClient = (
       env: serverParams.env || undefined,
       stderr: "pipe",
     };
-    transport = new StdioClientTransport(stdioParams);
+    transport = new ProcessManagedStdioTransport(stdioParams);
 
     // Handle stderr stream when set to "pipe"
-    if ((transport as StdioClientTransport).stderr) {
-      const stderrStream = (transport as StdioClientTransport).stderr;
+    if ((transport as ProcessManagedStdioTransport).stderr) {
+      const stderrStream = (transport as ProcessManagedStdioTransport).stderr;
 
       stderrStream?.on("data", (chunk: Buffer) => {
         metamcpLogStore.addLog(
