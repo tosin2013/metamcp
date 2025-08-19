@@ -2,8 +2,8 @@ import { ChildProcess, IOType } from "node:child_process";
 import process from "node:process";
 import { PassThrough, Stream } from "node:stream";
 
-import { Transport } from "@modelcontextprotocol/sdk/shared/transport";
-import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import spawn from "cross-spawn";
 
 import { ReadBuffer, serializeMessage } from "./shared";

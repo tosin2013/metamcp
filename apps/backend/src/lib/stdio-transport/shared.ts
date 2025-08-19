@@ -1,7 +1,7 @@
 import {
   JSONRPCMessage,
   JSONRPCMessageSchema,
-} from "@modelcontextprotocol/sdk/types";
+} from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Buffers a continuous stdio stream into discrete JSON-RPC messages.

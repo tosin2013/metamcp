@@ -1,5 +1,5 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol";
+import { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   CallToolRequestSchema,
   CallToolResult,
