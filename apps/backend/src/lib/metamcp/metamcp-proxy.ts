@@ -199,9 +199,73 @@ export const createServer = async (
       throw new Error(`Invalid tool name format: ${name}`);
     }
 
+    const serverPrefix = name.substring(0, firstDoubleUnderscoreIndex);
     const originalToolName = name.substring(firstDoubleUnderscoreIndex + 2);
-    const clientForTool = toolToClient[name];
-    const serverUuid = toolToServerUuid[name];
+
+    // Try to find the tool in pre-populated mappings first
+    let clientForTool = toolToClient[name];
+    let serverUuid = toolToServerUuid[name];
+
+    // If not found in mappings, dynamically find the server and route the call
+    if (!clientForTool || !serverUuid) {
+      try {
+        // Get all MCP servers for this namespace
+        const serverParams = await getMcpServers(
+          namespaceUuid,
+          includeInactiveServers,
+        );
+
+        // Find the server with the matching name prefix
+        for (const [mcpServerUuid, params] of Object.entries(serverParams)) {
+          const session = await mcpServerPool.getSession(
+            sessionId,
+            mcpServerUuid,
+            params,
+          );
+
+          if (session) {
+            const capabilities = session.client.getServerCapabilities();
+            if (!capabilities?.tools) continue;
+
+            // Use name assigned by user, fallback to name from server
+            const serverName =
+              params.name || session.client.getServerVersion()?.name || "";
+
+            if (sanitizeName(serverName) === serverPrefix) {
+              // Found the server, now check if it has this tool
+              try {
+                const result = await session.client.request(
+                  {
+                    method: "tools/list",
+                    params: {},
+                  },
+                  ListToolsResultSchema,
+                );
+
+                if (
+                  result.tools?.some((tool) => tool.name === originalToolName)
+                ) {
+                  // Tool exists, populate mappings for future use and use it
+                  clientForTool = session;
+                  serverUuid = mcpServerUuid;
+                  toolToClient[name] = session;
+                  toolToServerUuid[name] = mcpServerUuid;
+                  break;
+                }
+              } catch (error) {
+                console.error(
+                  `Error checking tools for server ${serverName}:`,
+                  error,
+                );
+                continue;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error dynamically finding tool ${name}:`, error);
+      }
+    }
 
     if (!clientForTool) {
       throw new Error(`Unknown tool: ${name}`);
