@@ -48,9 +48,6 @@ export const createServer = async (
   const promptToClient: Record<string, ConnectedClient> = {};
   const resourceToClient: Record<string, ConnectedClient> = {};
 
-  // Track visited servers to detect circular references
-  const visitedServers = new Set<string>();
-
   // Helper function to detect if a server is the same instance
   const isSameServerInstance = (
     params: { name?: string; url?: string | null },
@@ -95,6 +92,9 @@ export const createServer = async (
       includeInactiveServers,
     );
     const allTools: Tool[] = [];
+
+    // Track visited servers to detect circular references - reset on each call
+    const visitedServers = new Set<string>();
 
     // We'll filter servers during processing after getting sessions to check actual MCP server names
     const allServerEntries = Object.entries(serverParams);
@@ -396,6 +396,9 @@ export const createServer = async (
     );
     const allPrompts: z.infer<typeof ListPromptsResultSchema>["prompts"] = [];
 
+    // Track visited servers to detect circular references - reset on each call
+    const visitedServers = new Set<string>();
+
     // Filter out self-referencing servers before processing
     const validPromptServers = Object.entries(serverParams).filter(
       ([uuid, params]) => {
@@ -488,6 +491,9 @@ export const createServer = async (
     );
     const allResources: z.infer<typeof ListResourcesResultSchema>["resources"] =
       [];
+
+    // Track visited servers to detect circular references - reset on each call
+    const visitedServers = new Set<string>();
 
     // Filter out self-referencing servers before processing
     const validResourceServers = Object.entries(serverParams).filter(
@@ -611,6 +617,9 @@ export const createServer = async (
         includeInactiveServers,
       );
       const allTemplates: ResourceTemplate[] = [];
+
+      // Track visited servers to detect circular references - reset on each call
+      const visitedServers = new Set<string>();
 
       // Filter out self-referencing servers before processing
       const validTemplateServers = Object.entries(serverParams).filter(
