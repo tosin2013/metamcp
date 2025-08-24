@@ -79,8 +79,8 @@ export class McpServerPool {
         `Converted idle session to active for server ${serverUuid}, session ${sessionId}`,
       );
 
-      // Create a new idle session to replace the one we just used (SYNC - BLOCKING)
-      await this.createIdleSession(serverUuid, params);
+      // Create a new idle session to replace the one we just used (ASYNC - NON-BLOCKING)
+      this.createIdleSessionAsync(serverUuid, params);
 
       return idleClient;
     }
@@ -98,8 +98,8 @@ export class McpServerPool {
       `Created new active session for server ${serverUuid}, session ${sessionId}`,
     );
 
-    // Also create an idle session for future use (SYNC - BLOCKING)
-    await this.createIdleSession(serverUuid, params);
+    // Also create an idle session for future use (ASYNC - NON-BLOCKING)
+    this.createIdleSessionAsync(serverUuid, params);
 
     return newClient;
   }

@@ -73,8 +73,8 @@ export class MetaMcpServerPool {
         `Converted idle MetaMCP server to active for namespace ${namespaceUuid}, session ${sessionId}`,
       );
 
-      // Create a new idle server to replace the one we just used (SYNC - BLOCKING)
-      await this.createIdleServer(namespaceUuid, includeInactiveServers);
+      // Create a new idle server to replace the one we just used (ASYNC - NON-BLOCKING)
+      this.createIdleServerAsync(namespaceUuid, includeInactiveServers);
 
       return idleServer;
     }
@@ -96,8 +96,8 @@ export class MetaMcpServerPool {
       `Created new active MetaMCP server for namespace ${namespaceUuid}, session ${sessionId}`,
     );
 
-    // Also create an idle server for future use (SYNC - BLOCKING)
-    await this.createIdleServer(namespaceUuid, includeInactiveServers);
+    // Also create an idle server for future use (ASYNC - NON-BLOCKING)
+    this.createIdleServerAsync(namespaceUuid, includeInactiveServers);
 
     return newServer;
   }
