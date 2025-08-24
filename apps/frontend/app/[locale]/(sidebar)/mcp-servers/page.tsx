@@ -341,6 +341,7 @@ export default function McpServersPage() {
                                 {...field}
                                 placeholder={t("mcp-servers:envPlaceholder")}
                                 rows={3}
+                                className="whitespace-pre-wrap break-all overflow-x-hidden"
                               />
                             </FormControl>
                             <FormMessage />
