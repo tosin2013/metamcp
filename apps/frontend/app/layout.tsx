@@ -5,8 +5,8 @@ import localFont from "next/font/local";
 import { PublicEnvScript } from "next-runtime-env";
 import { Toaster } from "sonner";
 
-import { TRPCProvider } from "../components/providers/trpc-provider";
 import { ThemeProvider } from "../components/providers/theme-provider";
+import { TRPCProvider } from "../components/providers/trpc-provider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
