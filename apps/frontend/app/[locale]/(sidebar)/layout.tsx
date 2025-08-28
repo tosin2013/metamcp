@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { LogsStatusIndicator } from "@/components/logs-status-indicator";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -150,15 +151,18 @@ export default function SidebarLayout({
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader className="flex flex-col justify-center items-center px-2 py-4">
-          <div className="flex items-center gap-4 mb-2">
-            <Image
-              src="/favicon.ico"
-              alt="MetaMCP Logo"
-              width={256}
-              height={256}
-              className="h-12 w-12"
-            />
-            <h2 className="text-2xl font-semibold">MetaMCP</h2>
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="flex items-center gap-4">
+              <Image
+                src="/favicon.ico"
+                alt="MetaMCP Logo"
+                width={256}
+                height={256}
+                className="h-12 w-12"
+              />
+              <h2 className="text-2xl font-semibold">MetaMCP</h2>
+            </div>
+            <ThemeToggle />
           </div>
         </SidebarHeader>
 
