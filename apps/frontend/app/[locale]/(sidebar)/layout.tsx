@@ -119,7 +119,7 @@ function UserInfoFooter() {
             <LanguageSwitcher />
             <ThemeToggle />
           </div>
-          <p className="text-xs text-muted-foreground">v2.4.10</p>
+          <p className="text-xs text-muted-foreground">v2.4.11</p>
         </div>
         <Separator />
         {user && (
@@ -132,7 +132,12 @@ function UserInfoFooter() {
                 {user.email}
               </span>
             </div>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSignOut}
+              className="w-full"
+            >
               {t("auth:signOut")}
             </Button>
           </div>
