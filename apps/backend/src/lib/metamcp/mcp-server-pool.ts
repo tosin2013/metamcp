@@ -1,6 +1,7 @@
 import { ServerParameters } from "@repo/zod-types";
 
 import { ConnectedClient, connectMetaMcpClient } from "./client";
+import { serverErrorTracker } from "./server-error-tracker";
 
 export interface McpServerPoolStatus {
   idle: number;
@@ -52,6 +53,7 @@ export class McpServerPool {
     sessionId: string,
     serverUuid: string,
     params: ServerParameters,
+    namespaceUuid?: string,
   ): Promise<ConnectedClient | undefined> {
     // Update server params cache
     this.serverParamsCache[serverUuid] = params;
@@ -80,13 +82,13 @@ export class McpServerPool {
       );
 
       // Create a new idle session to replace the one we just used (ASYNC - NON-BLOCKING)
-      this.createIdleSessionAsync(serverUuid, params);
+      this.createIdleSessionAsync(serverUuid, params, namespaceUuid);
 
       return idleClient;
     }
 
     // No idle session available, create a new connection
-    const newClient = await this.createNewConnection(params);
+    const newClient = await this.createNewConnection(params, namespaceUuid);
     if (!newClient) {
       return undefined;
     }
@@ -99,7 +101,7 @@ export class McpServerPool {
     );
 
     // Also create an idle session for future use (ASYNC - NON-BLOCKING)
-    this.createIdleSessionAsync(serverUuid, params);
+    this.createIdleSessionAsync(serverUuid, params, namespaceUuid);
 
     return newClient;
   }
@@ -109,8 +111,27 @@ export class McpServerPool {
    */
   private async createNewConnection(
     params: ServerParameters,
+    namespaceUuid?: string,
   ): Promise<ConnectedClient | undefined> {
-    const connectedClient = await connectMetaMcpClient(params);
+    const connectedClient = await connectMetaMcpClient(
+      params,
+      namespaceUuid
+        ? (exitCode, signal) => {
+            // Handle process crash
+            this.handleServerCrash(
+              params.uuid,
+              namespaceUuid,
+              exitCode,
+              signal,
+            ).catch((error) => {
+              console.error(
+                `Error handling server crash for ${params.uuid} in ${namespaceUuid}:`,
+                error,
+              );
+            });
+          }
+        : undefined,
+    );
     if (!connectedClient) {
       return undefined;
     }
@@ -124,13 +145,14 @@ export class McpServerPool {
   private async createIdleSession(
     serverUuid: string,
     params: ServerParameters,
+    namespaceUuid?: string,
   ): Promise<void> {
     // Don't create if we already have an idle session for this server
     if (this.idleSessions[serverUuid]) {
       return;
     }
 
-    const newClient = await this.createNewConnection(params);
+    const newClient = await this.createNewConnection(params, namespaceUuid);
     if (newClient) {
       this.idleSessions[serverUuid] = newClient;
       console.log(`Created idle session for server ${serverUuid}`);
@@ -143,6 +165,7 @@ export class McpServerPool {
   private createIdleSessionAsync(
     serverUuid: string,
     params: ServerParameters,
+    namespaceUuid?: string,
   ): void {
     // Don't create if we already have an idle session or are already creating one
     if (
@@ -156,7 +179,7 @@ export class McpServerPool {
     this.creatingIdleSessions.add(serverUuid);
 
     // Create the session in the background (fire and forget)
-    this.createNewConnection(params)
+    this.createNewConnection(params, namespaceUuid)
       .then((newClient) => {
         if (newClient && !this.idleSessions[serverUuid]) {
           this.idleSessions[serverUuid] = newClient;
@@ -190,11 +213,12 @@ export class McpServerPool {
    */
   async ensureIdleSessions(
     serverParams: Record<string, ServerParameters>,
+    namespaceUuid?: string,
   ): Promise<void> {
     const promises = Object.entries(serverParams).map(
       async ([uuid, params]) => {
         if (!this.idleSessions[uuid]) {
-          await this.createIdleSession(uuid, params);
+          await this.createIdleSession(uuid, params, namespaceUuid);
         }
       },
     );
@@ -228,6 +252,8 @@ export class McpServerPool {
       Array.from(serverUuids).forEach((serverUuid) => {
         const params = this.serverParamsCache[serverUuid];
         if (params) {
+          // Note: We don't have namespaceUuid here, so we can't track crashes properly
+          // This is a limitation of the current design - we'll need to pass namespaceUuid from the caller
           this.createIdleSessionAsync(serverUuid, params);
         }
       });
@@ -307,6 +333,7 @@ export class McpServerPool {
   async invalidateIdleSession(
     serverUuid: string,
     params: ServerParameters,
+    namespaceUuid?: string,
   ): Promise<void> {
     console.log(`Invalidating idle session for server ${serverUuid}`);
 
@@ -334,7 +361,7 @@ export class McpServerPool {
     this.creatingIdleSessions.delete(serverUuid);
 
     // Create a new idle session with updated parameters
-    await this.createIdleSession(serverUuid, params);
+    await this.createIdleSession(serverUuid, params, namespaceUuid);
   }
 
   /**
@@ -342,9 +369,10 @@ export class McpServerPool {
    */
   async invalidateIdleSessions(
     serverParams: Record<string, ServerParameters>,
+    namespaceUuid?: string,
   ): Promise<void> {
     const promises = Object.entries(serverParams).map(([serverUuid, params]) =>
-      this.invalidateIdleSession(serverUuid, params),
+      this.invalidateIdleSession(serverUuid, params, namespaceUuid),
     );
 
     await Promise.allSettled(promises);
@@ -386,6 +414,7 @@ export class McpServerPool {
   async ensureIdleSessionForNewServer(
     serverUuid: string,
     params: ServerParameters,
+    namespaceUuid?: string,
   ): Promise<void> {
     console.log(`Ensuring idle session exists for new server ${serverUuid}`);
 
@@ -397,8 +426,107 @@ export class McpServerPool {
       !this.idleSessions[serverUuid] &&
       !this.creatingIdleSessions.has(serverUuid)
     ) {
-      await this.createIdleSession(serverUuid, params);
+      await this.createIdleSession(serverUuid, params, namespaceUuid);
     }
+  }
+
+  /**
+   * Handle server process crash
+   */
+  async handleServerCrash(
+    serverUuid: string,
+    namespaceUuid: string,
+    exitCode: number | null,
+    signal: string | null,
+  ): Promise<void> {
+    console.warn(
+      `Handling server crash for ${serverUuid} in namespace ${namespaceUuid}`,
+    );
+
+    // Record the crash in the error tracker
+    await serverErrorTracker.recordServerCrash(
+      serverUuid,
+      namespaceUuid,
+      exitCode,
+      signal,
+    );
+
+    // Clean up any existing sessions for this server
+    await this.cleanupServerSessions(serverUuid);
+  }
+
+  /**
+   * Clean up all sessions for a specific server
+   */
+  private async cleanupServerSessions(serverUuid: string): Promise<void> {
+    // Clean up idle session
+    const idleSession = this.idleSessions[serverUuid];
+    if (idleSession) {
+      try {
+        await idleSession.cleanup();
+        console.log(`Cleaned up idle session for crashed server ${serverUuid}`);
+      } catch (error) {
+        console.error(
+          `Error cleaning up idle session for crashed server ${serverUuid}:`,
+          error,
+        );
+      }
+      delete this.idleSessions[serverUuid];
+    }
+
+    // Clean up active sessions that use this server
+    for (const [sessionId, sessionServers] of Object.entries(
+      this.activeSessions,
+    )) {
+      if (sessionServers[serverUuid]) {
+        try {
+          await sessionServers[serverUuid].cleanup();
+          console.log(
+            `Cleaned up active session ${sessionId} for crashed server ${serverUuid}`,
+          );
+        } catch (error) {
+          console.error(
+            `Error cleaning up active session ${sessionId} for crashed server ${serverUuid}:`,
+            error,
+          );
+        }
+        delete sessionServers[serverUuid];
+        this.sessionToServers[sessionId]?.delete(serverUuid);
+      }
+    }
+
+    // Remove from creating set
+    this.creatingIdleSessions.delete(serverUuid);
+  }
+
+  /**
+   * Check if a server is in error state for a namespace
+   */
+  async isServerInErrorState(
+    serverUuid: string,
+    namespaceUuid: string,
+  ): Promise<boolean> {
+    return await serverErrorTracker.isServerInErrorState(
+      serverUuid,
+      namespaceUuid,
+    );
+  }
+
+  /**
+   * Reset error state for a server in a namespace (e.g., after manual recovery)
+   */
+  async resetServerErrorState(
+    serverUuid: string,
+    namespaceUuid: string,
+  ): Promise<void> {
+    // Reset crash attempts
+    serverErrorTracker.resetServerAttempts(serverUuid, namespaceUuid);
+
+    // Note: The actual status update would need to be done through the namespace management API
+    // This just resets the local tracking
+    console.log(
+      `Reset error state for server ${serverUuid} in namespace ${namespaceUuid}`,
+    );
   }
 }
 

@@ -1,6 +1,10 @@
 import { OAuthClientInformation } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { McpServerStatusEnum, McpServerTypeEnum } from "@repo/zod-types";
+import {
+  McpServerErrorStatusEnum,
+  McpServerStatusEnum,
+  McpServerTypeEnum,
+} from "@repo/zod-types";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -21,6 +25,10 @@ export const mcpServerTypeEnum = pgEnum(
 export const mcpServerStatusEnum = pgEnum(
   "mcp_server_status",
   McpServerStatusEnum.options,
+);
+export const mcpServerErrorStatusEnum = pgEnum(
+  "mcp_server_error_status",
+  McpServerErrorStatusEnum.options,
 );
 
 export const mcpServersTable = pgTable(
@@ -273,6 +281,9 @@ export const namespaceServerMappingsTable = pgTable(
     status: mcpServerStatusEnum("status")
       .notNull()
       .default(McpServerStatusEnum.Enum.ACTIVE),
+    error_status: mcpServerErrorStatusEnum("error_status")
+      .notNull()
+      .default(McpServerErrorStatusEnum.Enum.NONE),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -285,6 +296,7 @@ export const namespaceServerMappingsTable = pgTable(
       table.mcp_server_uuid,
     ),
     index("namespace_server_mappings_status_idx").on(table.status),
+    index("namespace_server_mappings_error_status_idx").on(table.error_status),
     unique("namespace_server_mappings_unique_idx").on(
       table.namespace_uuid,
       table.mcp_server_uuid,

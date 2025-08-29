@@ -13,6 +13,7 @@ const sleep = (time: number) =>
 export interface ConnectedClient {
   client: Client;
   cleanup: () => Promise<void>;
+  onProcessCrash?: (exitCode: number | null, signal: string | null) => void;
 }
 
 /**
@@ -144,6 +145,7 @@ export const createMetaMcpClient = (
 
 export const connectMetaMcpClient = async (
   serverParams: ServerParameters,
+  onProcessCrash?: (exitCode: number | null, signal: string | null) => void,
 ): Promise<ConnectedClient | undefined> => {
   const waitFor = 5000;
   const retries = 3;
@@ -160,11 +162,35 @@ export const connectMetaMcpClient = async (
 
       await client.connect(transport);
 
+      // Set up process crash detection for STDIO transports
+      if (transport instanceof ProcessManagedStdioTransport) {
+        transport.onprocesscrash = (exitCode, signal) => {
+          console.warn(
+            `Process crashed for server ${serverParams.name} (${serverParams.uuid}): code=${exitCode}, signal=${signal}`,
+          );
+
+          // Notify the pool about the crash
+          if (onProcessCrash) {
+            onProcessCrash(exitCode, signal);
+          }
+        };
+      }
+
       return {
         client,
         cleanup: async () => {
           await transport.close();
           await client.close();
+        },
+        onProcessCrash: (exitCode, signal) => {
+          console.warn(
+            `Process crash detected for server ${serverParams.name} (${serverParams.uuid}): code=${exitCode}, signal=${signal}`,
+          );
+
+          // Notify the pool about the crash
+          if (onProcessCrash) {
+            onProcessCrash(exitCode, signal);
+          }
         },
       };
     } catch (error) {

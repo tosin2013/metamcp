@@ -109,6 +109,7 @@ export const createServer = async (
           context.sessionId,
           mcpServerUuid,
           params,
+          namespaceUuid,
         );
         if (!session) return;
 
@@ -221,6 +222,7 @@ export const createServer = async (
             sessionId,
             mcpServerUuid,
             params,
+            namespaceUuid,
           );
 
           if (session) {
@@ -426,7 +428,12 @@ export const createServer = async (
 
     await Promise.allSettled(
       validPromptServers.map(async ([uuid, params]) => {
-        const session = await mcpServerPool.getSession(sessionId, uuid, params);
+        const session = await mcpServerPool.getSession(
+          sessionId,
+          uuid,
+          params,
+          namespaceUuid,
+        );
         if (!session) return;
 
         // Now check for self-referencing using the actual MCP server name
@@ -522,7 +529,12 @@ export const createServer = async (
 
     await Promise.allSettled(
       validResourceServers.map(async ([uuid, params]) => {
-        const session = await mcpServerPool.getSession(sessionId, uuid, params);
+        const session = await mcpServerPool.getSession(
+          sessionId,
+          uuid,
+          params,
+          namespaceUuid,
+        );
         if (!session) return;
 
         // Now check for self-referencing using the actual MCP server name
@@ -652,6 +664,7 @@ export const createServer = async (
             sessionId,
             uuid,
             params,
+            namespaceUuid,
           );
           if (!session) return;
 

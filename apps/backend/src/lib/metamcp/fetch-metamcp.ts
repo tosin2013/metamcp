@@ -1,4 +1,8 @@
-import { McpServerStatusEnum, ServerParameters } from "@repo/zod-types";
+import {
+  McpServerErrorStatusEnum,
+  McpServerStatusEnum,
+  ServerParameters,
+} from "@repo/zod-types";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../../db/index";
@@ -29,6 +33,14 @@ export async function getMcpServers(
       );
     }
 
+    // Always exclude servers with ERROR status (these are crashed servers)
+    whereConditions.push(
+      eq(
+        namespaceServerMappingsTable.error_status,
+        McpServerErrorStatusEnum.Enum.NONE,
+      ),
+    );
+
     // Fetch MCP servers for the specific namespace using a join query
     const servers = await db
       .select({
@@ -43,6 +55,7 @@ export async function getMcpServers(
         created_at: mcpServersTable.created_at,
         bearerToken: mcpServersTable.bearerToken,
         status: namespaceServerMappingsTable.status,
+        error_status: namespaceServerMappingsTable.error_status,
       })
       .from(mcpServersTable)
       .innerJoin(
@@ -81,6 +94,7 @@ export async function getMcpServers(
         created_at:
           server.created_at?.toISOString() || new Date().toISOString(),
         status: server.status.toLowerCase(),
+        error_status: server.error_status?.toLowerCase(),
         stderr: "inherit" as IOType,
         oauth_tokens: oauthTokens,
         bearerToken: server.bearerToken,

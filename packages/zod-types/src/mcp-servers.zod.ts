@@ -3,6 +3,8 @@ import { z } from "zod";
 export const McpServerTypeEnum = z.enum(["STDIO", "SSE", "STREAMABLE_HTTP"]);
 export const McpServerStatusEnum = z.enum(["ACTIVE", "INACTIVE"]);
 
+export const McpServerErrorStatusEnum = z.enum(["NONE", "ERROR"]);
+
 // Define the form schema (includes UI-specific fields)
 export const createServerFormSchema = z
   .object({
