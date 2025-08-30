@@ -97,7 +97,7 @@
     "noEndpointsDescription": "You haven't created any endpoints yet. Get started by creating your first endpoint to make your namespaces publicly accessible.",
     "copyEndpointUuid": "Copy endpoint UUID",
     "copyFullSseUrl": "Copy full SSE URL",
-    "copyFullShttpUrl": "Copy full SHTTP URL", 
+    "copyFullShttpUrl": "Copy full SHTTP URL",
     "copyFullOpenApiUrl": "Copy full OpenAPI URL",
     "copyOpenApiSchemaUrl": "Copy OpenAPI Schema URL",
     "copySseUrlWithApiKey": "Copy SSE URL with API key",
@@ -122,4 +122,4 @@
     "openApiSchemaUrlWithApiKeyCopied": "OpenAPI Schema URL with API key parameter copied to clipboard",
     "noResults": "No results."
   }
-} 
+}

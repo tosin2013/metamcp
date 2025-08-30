@@ -149,7 +149,10 @@
     "copyServerJson": "复制服务器 JSON",
     "viewDetails": "查看详情",
     "openInNewTab": "在新标签页中打开",
-    "toggleStatus": "切换 {{name}} 状态"
+    "toggleStatus": "切换 {{name}} 状态",
+    "errorStatus": "错误状态",
+    "error": "错误",
+    "noError": "无错误"
   },
   "toolManagement": {
     "toolsOverview": "工具概览：",
@@ -191,4 +194,4 @@
     "updateFailedDescription": "更新命名空间失败",
     "unexpectedError": "发生了意外错误"
   }
-} 
+}

@@ -437,6 +437,24 @@ export default function McpServerDetailPage({
                     {new Date(server.created_at).toLocaleTimeString()}
                   </p>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {t("mcp-servers:detail.errorStatus")}:
+                  </span>
+                  <div className="flex-1 ml-6 flex justify-end">
+                    <Badge
+                      variant={
+                        server.error_status === "ERROR"
+                          ? "destructive"
+                          : "success"
+                      }
+                    >
+                      {server.error_status === "ERROR"
+                        ? t("mcp-servers:detail.error")
+                        : t("mcp-servers:detail.noError")}
+                    </Badge>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -149,7 +149,10 @@
     "copyServerJson": "Copy server JSON",
     "viewDetails": "View details",
     "openInNewTab": "Open in new tab",
-    "toggleStatus": "Toggle {{name}} status"
+    "toggleStatus": "Toggle {{name}} status",
+    "errorStatus": "Error Status",
+    "error": "Error",
+    "noError": "No Error"
   },
   "toolManagement": {
     "toolsOverview": "Tools Overview:",
@@ -191,4 +194,4 @@
     "updateFailedDescription": "Failed to update namespace",
     "unexpectedError": "An unexpected error occurred"
   }
-} 
+}

@@ -186,6 +186,7 @@ export const McpServerSchema = z.object({
   created_at: z.string(),
   bearerToken: z.string().nullable(),
   user_id: z.string().nullable(),
+  error_status: McpServerErrorStatusEnum.optional(),
 });
 
 export const CreateMcpServerResponseSchema = z.object({

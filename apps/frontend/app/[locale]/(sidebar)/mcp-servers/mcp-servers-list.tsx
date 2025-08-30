@@ -189,6 +189,34 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
       },
     },
     {
+      accessorKey: "error_status",
+      size: 120,
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            {t("mcp-servers:list.errorStatus")}
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const errorStatus = row.getValue("error_status") as string;
+        const hasError = errorStatus === "ERROR";
+        return (
+          <div className="px-3 py-2">
+            <Badge variant={hasError ? "destructive" : "success"}>
+              {hasError
+                ? t("mcp-servers:list.error")
+                : t("mcp-servers:list.noError")}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "user_id",
       size: 120,
       header: ({ column }) => {

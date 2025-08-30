@@ -127,7 +127,10 @@
     "args": "Args: {{args}}",
     "url": "URL: {{url}}",
     "envVars": "Env: {{count}} vars",
-    "streamableHttp": "STREAMABLE_HTTP"
+    "streamableHttp": "STREAMABLE_HTTP",
+    "errorStatus": "Error Status",
+    "error": "Error",
+    "noError": "No Error"
   },
   "detail": {
     "backToServers": "Back to MCP Servers",
@@ -143,6 +146,9 @@
     "uuid": "UUID",
     "type": "Type",
     "created": "Created",
+    "errorStatus": "Error Status",
+    "error": "Error",
+    "noError": "No Error",
     "configuration": "Configuration",
     "command": "Command",
     "arguments": "Arguments",
@@ -198,4 +204,4 @@
     "failedToFetchTools": "Failed to fetch tools from MCP server",
     "failedToSaveTools": "Failed to save tools"
   }
-} 
+}
