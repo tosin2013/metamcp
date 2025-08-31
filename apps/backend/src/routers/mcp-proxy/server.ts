@@ -16,6 +16,7 @@ import { findActualExecutable } from "spawn-rx";
 
 import mcpProxy from "../../lib/mcp-proxy";
 import { transformDockerUrl } from "../../lib/metamcp/client";
+import { resolveEnvVariables } from "../../lib/metamcp/utils";
 import { ProcessManagedStdioTransport } from "../../lib/stdio-transport/process-managed-transport";
 import { betterAuthMcpMiddleware } from "../../middleware/better-auth-mcp.middleware";
 
@@ -151,28 +152,6 @@ const cleanupSession = async (sessionId: string) => {
   console.log(`Session ${sessionId} cleanup completed`);
 };
 
-// Function to resolve environment variable placeholders
-const resolveEnvVariables = (envObject: Record<string, any>): Record<string, any> => {
-  const resolved: Record<string, any> = {};
-  
-  for (const [key, value] of Object.entries(envObject)) {
-    if (typeof value === "string" && value.startsWith("${") && value.endsWith("}")) {
-      const varName = value.slice(2, -1);
-      if (process.env[varName]) {
-        resolved[key] = process.env[varName];
-        console.log(`Resolved environment variable: ${key}=${value} -> ${varName}=[REDACTED]`);
-      } else {
-        resolved[key] = value; // Keep original value if env var not found
-        console.warn(`Environment variable not found: ${varName}, keeping original value: ${value}`);
-      }
-    } else {
-      resolved[key] = value;
-    }
-  }
-  
-  return resolved;
-};
-
 const createTransport = async (req: express.Request): Promise<Transport> => {
   const query = req.query;
   console.log("Query parameters:", JSON.stringify(query));
@@ -183,10 +162,10 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
     const command = query.command as string;
     const origArgs = shellParseArgs(query.args as string) as string[];
     const queryEnv = query.env ? JSON.parse(query.env as string) : {};
-    
+
     // Resolve environment variable placeholders
     const resolvedQueryEnv = resolveEnvVariables(queryEnv);
-    
+
     const env = { ...process.env, ...defaultEnvironment, ...resolvedQueryEnv };
 
     const { cmd, args } = findActualExecutable(command, origArgs);
@@ -471,7 +450,11 @@ serverRouter.get("/stdio", async (req, res) => {
         const origArgs = shellParseArgs(query.args as string) as string[];
         const queryEnv = query.env ? JSON.parse(query.env as string) : {};
         const resolvedQueryEnv = resolveEnvVariables(queryEnv);
-        const env = { ...process.env, ...defaultEnvironment, ...resolvedQueryEnv };
+        const env = {
+          ...process.env,
+          ...defaultEnvironment,
+          ...resolvedQueryEnv,
+        };
         const { cmd, args } = findActualExecutable(command, origArgs);
 
         setStdioCooldown(cmd, args, env);
@@ -513,7 +496,11 @@ serverRouter.get("/stdio", async (req, res) => {
             const origArgs = shellParseArgs(query.args as string) as string[];
             const queryEnv = query.env ? JSON.parse(query.env as string) : {};
             const resolvedQueryEnv = resolveEnvVariables(queryEnv);
-            const env = { ...process.env, ...defaultEnvironment, ...resolvedQueryEnv };
+            const env = {
+              ...process.env,
+              ...defaultEnvironment,
+              ...resolvedQueryEnv,
+            };
             const { cmd, args } = findActualExecutable(command, origArgs);
 
             setStdioCooldown(cmd, args, env);

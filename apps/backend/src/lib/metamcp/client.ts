@@ -7,31 +7,10 @@ import { ServerParameters } from "@repo/zod-types";
 
 import { ProcessManagedStdioTransport } from "../stdio-transport/process-managed-transport";
 import { metamcpLogStore } from "./log-store";
+import { resolveEnvVariables } from "./utils";
 
 const sleep = (time: number) =>
   new Promise<void>((resolve) => setTimeout(() => resolve(), time));
-
-// Function to resolve environment variable placeholders
-const resolveEnvVariables = (envObject: Record<string, any>): Record<string, any> => {
-  const resolved: Record<string, any> = {};
-  
-  for (const [key, value] of Object.entries(envObject)) {
-    if (typeof value === "string" && value.startsWith("${") && value.endsWith("}")) {
-      const varName = value.slice(2, -1);
-      if (process.env[varName]) {
-        resolved[key] = process.env[varName];
-        console.log(`Resolved environment variable: ${key}=${value} -> ${varName}=[REDACTED]`);
-      } else {
-        resolved[key] = value; // Keep original value if env var not found
-        console.warn(`Environment variable not found: ${varName}, keeping original value: ${value}`);
-      }
-    } else {
-      resolved[key] = value;
-    }
-  }
-  
-  return resolved;
-};
 
 export interface ConnectedClient {
   client: Client;
@@ -61,8 +40,10 @@ export const createMetaMcpClient = (
   // Default to "STDIO" if type is undefined
   if (!serverParams.type || serverParams.type === "STDIO") {
     // Resolve environment variable placeholders
-    const resolvedEnv = serverParams.env ? resolveEnvVariables(serverParams.env) : undefined;
-    
+    const resolvedEnv = serverParams.env
+      ? resolveEnvVariables(serverParams.env)
+      : undefined;
+
     const stdioParams: StdioServerParameters = {
       command: serverParams.command || "",
       args: serverParams.args || undefined,
