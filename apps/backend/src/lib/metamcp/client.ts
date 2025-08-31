@@ -7,9 +7,11 @@ import { ServerParameters } from "@repo/zod-types";
 
 import { ProcessManagedStdioTransport } from "../stdio-transport/process-managed-transport";
 import { metamcpLogStore } from "./log-store";
+import { resolveEnvVariables } from "./utils";
 
 const sleep = (time: number) =>
   new Promise<void>((resolve) => setTimeout(() => resolve(), time));
+
 export interface ConnectedClient {
   client: Client;
   cleanup: () => Promise<void>;
@@ -37,10 +39,15 @@ export const createMetaMcpClient = (
   // Create the appropriate transport based on server type
   // Default to "STDIO" if type is undefined
   if (!serverParams.type || serverParams.type === "STDIO") {
+    // Resolve environment variable placeholders
+    const resolvedEnv = serverParams.env
+      ? resolveEnvVariables(serverParams.env)
+      : undefined;
+
     const stdioParams: StdioServerParameters = {
       command: serverParams.command || "",
       args: serverParams.args || undefined,
-      env: serverParams.env || undefined,
+      env: resolvedEnv,
       stderr: "pipe",
     };
     transport = new ProcessManagedStdioTransport(stdioParams);
