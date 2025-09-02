@@ -7,6 +7,7 @@ import { ServerParameters } from "@repo/zod-types";
 
 import { ProcessManagedStdioTransport } from "../stdio-transport/process-managed-transport";
 import { metamcpLogStore } from "./log-store";
+import { serverErrorTracker } from "./server-error-tracker";
 import { resolveEnvVariables } from "./utils";
 
 const sleep = (time: number) =>
@@ -155,12 +156,29 @@ export const connectMetaMcpClient = async (
   onProcessCrash?: (exitCode: number | null, signal: string | null) => void,
 ): Promise<ConnectedClient | undefined> => {
   const waitFor = 5000;
-  const retries = 3;
+  
+  // Get max attempts from server error tracker instead of hardcoding
+  const maxAttempts = serverErrorTracker.getServerMaxAttempts(serverParams.uuid);
   let count = 0;
   let retry = true;
 
+  console.log(
+    `Connecting to server ${serverParams.name} (${serverParams.uuid}) with max attempts: ${maxAttempts}`,
+  );
+
   while (retry) {
     try {
+      // Check if server is already in error state before attempting connection
+      const isInErrorState = await serverErrorTracker.isServerInErrorState(
+        serverParams.uuid,
+      );
+      if (isInErrorState) {
+        console.warn(
+          `Server ${serverParams.name} (${serverParams.uuid}) is already in ERROR state, skipping connection attempt`,
+        );
+        return undefined;
+      }
+
       // Create fresh client and transport for each attempt
       const { client, transport } = createMetaMcpClient(serverParams);
       if (!client || !transport) {
@@ -214,11 +232,11 @@ export const connectMetaMcpClient = async (
       metamcpLogStore.addLog(
         "client",
         "error",
-        `Error connecting to MetaMCP client (attempt ${count + 1}/${retries})`,
+        `Error connecting to MetaMCP client (attempt ${count + 1}/${maxAttempts})`,
         error,
       );
       count++;
-      retry = count < retries;
+      retry = count < maxAttempts;
       if (retry) {
         await sleep(waitFor);
       }

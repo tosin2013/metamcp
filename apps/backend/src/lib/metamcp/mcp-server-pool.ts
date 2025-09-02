@@ -465,12 +465,7 @@ export class McpServerPool {
     );
 
     // Record the crash in the error tracker
-    await serverErrorTracker.recordServerCrash(
-      serverUuid,
-      namespaceUuid,
-      exitCode,
-      signal,
-    );
+    await serverErrorTracker.recordServerCrash(serverUuid, exitCode, signal);
 
     // Clean up any existing sessions for this server
     await this.cleanupServerSessions(serverUuid);
@@ -489,16 +484,9 @@ export class McpServerPool {
       `Handling server crash for ${serverUuid} (no namespace context)`,
     );
 
-    // Record the crash in the error tracker with a global namespace
-    console.log(
-      `Recording crash for server ${serverUuid} with global namespace`,
-    );
-    await serverErrorTracker.recordServerCrash(
-      serverUuid,
-      "global", // Use a special namespace for servers without context
-      exitCode,
-      signal,
-    );
+    // Record the crash in the error tracker
+    console.log(`Recording crash for server ${serverUuid}`);
+    await serverErrorTracker.recordServerCrash(serverUuid, exitCode, signal);
 
     // Clean up any existing sessions for this server
     await this.cleanupServerSessions(serverUuid);
@@ -549,33 +537,20 @@ export class McpServerPool {
   }
 
   /**
-   * Check if a server is in error state for a namespace
+   * Check if a server is in error state
    */
-  async isServerInErrorState(
-    serverUuid: string,
-    namespaceUuid: string,
-  ): Promise<boolean> {
-    return await serverErrorTracker.isServerInErrorState(
-      serverUuid,
-      namespaceUuid,
-    );
+  async isServerInErrorState(serverUuid: string): Promise<boolean> {
+    return await serverErrorTracker.isServerInErrorState(serverUuid);
   }
 
   /**
-   * Reset error state for a server in a namespace (e.g., after manual recovery)
+   * Reset error state for a server (e.g., after manual recovery)
    */
-  async resetServerErrorState(
-    serverUuid: string,
-    namespaceUuid: string,
-  ): Promise<void> {
-    // Reset crash attempts
-    serverErrorTracker.resetServerAttempts(serverUuid, namespaceUuid);
+  async resetServerErrorState(serverUuid: string): Promise<void> {
+    // Reset crash attempts and error status
+    await serverErrorTracker.resetServerErrorState(serverUuid);
 
-    // Note: The actual status update would need to be done through the namespace management API
-    // This just resets the local tracking
-    console.log(
-      `Reset error state for server ${serverUuid} in namespace ${namespaceUuid}`,
-    );
+    console.log(`Reset error state for server ${serverUuid}`);
   }
 }
 

@@ -4,7 +4,6 @@ import { mcpServersRepository } from "../../db/repositories/index";
 
 export interface ServerCrashInfo {
   serverUuid: string;
-  namespaceUuid: string;
   exitCode: number | null;
   signal: string | null;
   timestamp: Date;
@@ -13,8 +12,8 @@ export interface ServerCrashInfo {
 export class ServerErrorTracker {
   private static instance: ServerErrorTracker | null = null;
 
-  // Track crash attempts per server per namespace
-  private crashAttempts: Map<string, Map<string, number>> = new Map();
+  // Track crash attempts per server
+  private crashAttempts: Map<string, number> = new Map();
 
   // Default max attempts before marking as ERROR
   private readonly defaultMaxAttempts: number = 1;
@@ -50,44 +49,36 @@ export class ServerErrorTracker {
    */
   async recordServerCrash(
     serverUuid: string,
-    namespaceUuid: string,
     exitCode: number | null,
     signal: string | null,
   ): Promise<void> {
-    console.log(
-      `recordServerCrash called for server ${serverUuid} in namespace ${namespaceUuid}`,
-    );
+    console.log(`recordServerCrash called for server ${serverUuid}`);
 
     // Get current attempt count
-    const currentAttempts =
-      this.crashAttempts.get(serverUuid)?.get(namespaceUuid) || 0;
+    const currentAttempts = this.crashAttempts.get(serverUuid) || 0;
     const newAttempts = currentAttempts + 1;
 
     // Update crash attempts tracking
-    if (!this.crashAttempts.has(serverUuid)) {
-      this.crashAttempts.set(serverUuid, new Map());
-    }
-    this.crashAttempts.get(serverUuid)?.set(namespaceUuid, newAttempts);
+    this.crashAttempts.set(serverUuid, newAttempts);
 
     const maxAttempts = this.getServerMaxAttempts(serverUuid);
 
     console.log(
-      `Server ${serverUuid} crashed in namespace ${namespaceUuid}. Attempt ${newAttempts}/${maxAttempts}`,
+      `Server ${serverUuid} crashed. Attempt ${newAttempts}/${maxAttempts}`,
     );
 
     // If we've reached max attempts, mark the server as ERROR
     if (newAttempts >= maxAttempts) {
       console.warn(
-        `Server ${serverUuid} has crashed ${newAttempts} times in namespace ${namespaceUuid}. Marking as ERROR.`,
+        `Server ${serverUuid} has crashed ${newAttempts} times. Marking as ERROR.`,
       );
 
       try {
-        await this.markServerAsError(serverUuid, namespaceUuid);
+        await this.markServerAsError(serverUuid);
 
         // Log the crash info
         const crashInfo: ServerCrashInfo = {
           serverUuid,
-          namespaceUuid,
           exitCode,
           signal,
           timestamp: new Date(),
@@ -98,10 +89,7 @@ export class ServerErrorTracker {
           crashInfo,
         );
       } catch (error) {
-        console.error(
-          `Failed to mark server ${serverUuid} as ERROR in namespace ${namespaceUuid}:`,
-          error,
-        );
+        console.error(`Failed to mark server ${serverUuid} as ERROR:`, error);
       }
     }
   }
@@ -109,10 +97,7 @@ export class ServerErrorTracker {
   /**
    * Mark a server as ERROR
    */
-  private async markServerAsError(
-    serverUuid: string,
-    _namespaceUuid: string,
-  ): Promise<void> {
+  private async markServerAsError(serverUuid: string): Promise<void> {
     try {
       // Update the server-level error status
       await mcpServersRepository.updateServerErrorStatus({
@@ -127,41 +112,23 @@ export class ServerErrorTracker {
   }
 
   /**
-   * Reset crash attempts for a server in a namespace (e.g., after successful recovery)
+   * Reset crash attempts for a server (e.g., after successful recovery)
    */
-  resetServerAttempts(serverUuid: string, namespaceUuid: string): void {
-    const serverAttempts = this.crashAttempts.get(serverUuid);
-    if (serverAttempts) {
-      serverAttempts.delete(namespaceUuid);
-
-      // Clean up empty server entry
-      if (serverAttempts.size === 0) {
-        this.crashAttempts.delete(serverUuid);
-      }
-    }
-  }
-
-  /**
-   * Reset crash attempts for all namespaces of a server
-   */
-  resetServerAttemptsForAllNamespaces(serverUuid: string): void {
+  resetServerAttempts(serverUuid: string): void {
     this.crashAttempts.delete(serverUuid);
   }
 
   /**
-   * Get current crash attempts for a server in a namespace
+   * Get current crash attempts for a server
    */
-  getServerAttempts(serverUuid: string, namespaceUuid: string): number {
-    return this.crashAttempts.get(serverUuid)?.get(namespaceUuid) || 0;
+  getServerAttempts(serverUuid: string): number {
+    return this.crashAttempts.get(serverUuid) || 0;
   }
 
   /**
    * Check if a server is in ERROR state
    */
-  async isServerInErrorState(
-    serverUuid: string,
-    _namespaceUuid: string,
-  ): Promise<boolean> {
+  async isServerInErrorState(serverUuid: string): Promise<boolean> {
     try {
       const server = await mcpServersRepository.findByUuid(serverUuid);
       return server?.error_status === McpServerErrorStatusEnum.Enum.ERROR;
@@ -177,13 +144,10 @@ export class ServerErrorTracker {
   /**
    * Reset error state for a server (e.g., after manual recovery)
    */
-  async resetServerErrorState(
-    serverUuid: string,
-    namespaceUuid: string,
-  ): Promise<void> {
+  async resetServerErrorState(serverUuid: string): Promise<void> {
     try {
       // Reset crash attempts
-      this.resetServerAttempts(serverUuid, namespaceUuid);
+      this.resetServerAttempts(serverUuid);
 
       // Update the database to clear the error status
       await mcpServersRepository.updateServerErrorStatus({
