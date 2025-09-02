@@ -6,6 +6,7 @@ import {
   DeleteMcpServerResponseSchema,
   GetMcpServerResponseSchema,
   ListMcpServersResponseSchema,
+  McpServerTypeEnum,
   UpdateMcpServerRequestSchema,
   UpdateMcpServerResponseSchema,
 } from "@repo/zod-types";
@@ -18,6 +19,7 @@ import {
 import { McpServersSerializer } from "../db/serializers";
 import { mcpServerPool } from "../lib/metamcp/mcp-server-pool";
 import { metaMcpServerPool } from "../lib/metamcp/metamcp-server-pool";
+import { serverErrorTracker } from "../lib/metamcp/server-error-tracker";
 import { convertDbServerToParams } from "../lib/metamcp/utils";
 
 export const mcpServersImplementations = {
@@ -358,6 +360,21 @@ export const mcpServersImplementations = {
           success: false as const,
           message: "MCP server not found",
         };
+      }
+
+      // Reset error status for stdio servers when they are updated
+      if (updatedServer.type === McpServerTypeEnum.Enum.STDIO) {
+        try {
+          await serverErrorTracker.resetServerErrorState(updatedServer.uuid);
+          console.log(
+            `Reset error status for updated stdio server: ${updatedServer.name} (${updatedServer.uuid})`,
+          );
+        } catch (error) {
+          console.error(
+            `Error resetting error status for updated stdio server ${updatedServer.name} (${updatedServer.uuid}):`,
+            error,
+          );
+        }
       }
 
       // Invalidate idle session for the updated server to refresh with new parameters (async)

@@ -1,6 +1,7 @@
 import { McpServerErrorStatusEnum } from "@repo/zod-types";
 
 import { mcpServersRepository } from "../../db/repositories/index";
+import { configService } from "../config.service";
 
 export interface ServerCrashInfo {
   serverUuid: string;
@@ -15,8 +16,8 @@ export class ServerErrorTracker {
   // Track crash attempts per server
   private crashAttempts: Map<string, number> = new Map();
 
-  // Default max attempts before marking as ERROR
-  private readonly defaultMaxAttempts: number = 1;
+  // Default max attempts before marking as ERROR (fallback if config is not available)
+  private readonly fallbackMaxAttempts: number = 1;
 
   // Server-specific max attempts (can be configured per server)
   private serverMaxAttempts: Map<string, number> = new Map();
@@ -40,8 +41,23 @@ export class ServerErrorTracker {
   /**
    * Get max attempts for a specific server
    */
-  getServerMaxAttempts(serverUuid: string): number {
-    return this.serverMaxAttempts.get(serverUuid) || this.defaultMaxAttempts;
+  async getServerMaxAttempts(serverUuid: string): Promise<number> {
+    // First check for server-specific configuration
+    const serverSpecific = this.serverMaxAttempts.get(serverUuid);
+    if (serverSpecific !== undefined) {
+      return serverSpecific;
+    }
+
+    // Then check global configuration
+    try {
+      return await configService.getMcpMaxAttempts();
+    } catch (error) {
+      console.warn(
+        "Failed to get MCP max attempts from config, using fallback:",
+        error,
+      );
+      return this.fallbackMaxAttempts;
+    }
   }
 
   /**
@@ -61,7 +77,7 @@ export class ServerErrorTracker {
     // Update crash attempts tracking
     this.crashAttempts.set(serverUuid, newAttempts);
 
-    const maxAttempts = this.getServerMaxAttempts(serverUuid);
+    const maxAttempts = await this.getServerMaxAttempts(serverUuid);
 
     console.log(
       `Server ${serverUuid} crashed. Attempt ${newAttempts}/${maxAttempts}`,

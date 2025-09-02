@@ -33,6 +33,7 @@ export default function SettingsPage() {
     defaultValues: {
       mcpTimeout: 60000,
       mcpMaxTotalTimeout: 60000,
+      mcpMaxAttempts: 1,
     },
   });
 
@@ -66,6 +67,12 @@ export default function SettingsPage() {
     isLoading: mcpMaxTotalLoading,
     refetch: refetchMcpMaxTotal,
   } = trpc.frontend.config.getMcpMaxTotalTimeout.useQuery();
+
+  const {
+    data: mcpMaxAttemptsData,
+    isLoading: mcpMaxAttemptsLoading,
+    refetch: refetchMcpMaxAttempts,
+  } = trpc.frontend.config.getMcpMaxAttempts.useQuery();
 
   // Mutations
   const setSignupDisabledMutation =
@@ -113,6 +120,18 @@ export default function SettingsPage() {
       },
     });
 
+  const setMcpMaxAttemptsMutation =
+    trpc.frontend.config.setMcpMaxAttempts.useMutation({
+      onSuccess: (data) => {
+        if (data.success) {
+          refetchMcpMaxAttempts();
+          setHasUnsavedChanges(false);
+        } else {
+          console.error("Failed to update MCP max attempts setting");
+        }
+      },
+    });
+
   // Update local state when data is loaded
   useEffect(() => {
     if (signupDisabled !== undefined) {
@@ -138,15 +157,26 @@ export default function SettingsPage() {
     }
   }, [mcpMaxTotalTimeoutData, form]);
 
+  useEffect(() => {
+    if (mcpMaxAttemptsData !== undefined) {
+      form.setValue("mcpMaxAttempts", mcpMaxAttemptsData);
+    }
+  }, [mcpMaxAttemptsData, form]);
+
   // Reset form with loaded data to establish proper baseline for change detection
   useEffect(() => {
-    if (mcpTimeoutData !== undefined && mcpMaxTotalTimeoutData !== undefined) {
+    if (
+      mcpTimeoutData !== undefined &&
+      mcpMaxTotalTimeoutData !== undefined &&
+      mcpMaxAttemptsData !== undefined
+    ) {
       form.reset({
         mcpTimeout: mcpTimeoutData,
         mcpMaxTotalTimeout: mcpMaxTotalTimeoutData,
+        mcpMaxAttempts: mcpMaxAttemptsData,
       });
     }
-  }, [mcpTimeoutData, mcpMaxTotalTimeoutData, form]);
+  }, [mcpTimeoutData, mcpMaxTotalTimeoutData, mcpMaxAttemptsData, form]);
 
   // Handle immediate switch updates
   const handleSignupToggle = async (checked: boolean) => {
@@ -195,6 +225,9 @@ export default function SettingsPage() {
         setMcpMaxTotalTimeoutMutation.mutateAsync({
           timeout: data.mcpMaxTotalTimeout,
         }),
+        setMcpMaxAttemptsMutation.mutateAsync({
+          maxAttempts: data.mcpMaxAttempts,
+        }),
       ]);
       reset(data); // Reset form state to match current values
       toast.success(t("settings:saved"));
@@ -212,7 +245,11 @@ export default function SettingsPage() {
   }, [isDirty]);
 
   const isLoading =
-    signupLoading || mcpResetLoading || mcpTimeoutLoading || mcpMaxTotalLoading;
+    signupLoading ||
+    mcpResetLoading ||
+    mcpTimeoutLoading ||
+    mcpMaxTotalLoading ||
+    mcpMaxAttemptsLoading;
 
   if (isLoading) {
     return (
@@ -347,6 +384,38 @@ export default function SettingsPage() {
                   )}
                 />
                 <span className="text-sm text-muted-foreground">ms</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mcp-max-attempts" className="text-base">
+                {t("settings:mcpMaxAttempts")}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {t("settings:mcpMaxAttemptsDescription")}
+              </p>
+              <div className="flex items-center space-x-2">
+                <Controller
+                  name="mcpMaxAttempts"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      id="mcp-max-attempts"
+                      type="number"
+                      min="1"
+                      max="10"
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value, 10);
+                        field.onChange(isNaN(value) ? 1 : value);
+                      }}
+                      className="w-32"
+                    />
+                  )}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {t("settings:attempts")}
+                </span>
               </div>
             </div>
 

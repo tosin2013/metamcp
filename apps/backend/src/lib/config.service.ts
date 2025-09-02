@@ -61,6 +61,21 @@ export const configService = {
     );
   },
 
+  async getMcpMaxAttempts(): Promise<number> {
+    const config = await configRepo.getConfig(
+      ConfigKeyEnum.Enum.MCP_MAX_ATTEMPTS,
+    );
+    return config?.value ? parseInt(config.value, 10) : 1;
+  },
+
+  async setMcpMaxAttempts(maxAttempts: number): Promise<void> {
+    await configRepo.setConfig(
+      ConfigKeyEnum.Enum.MCP_MAX_ATTEMPTS,
+      maxAttempts.toString(),
+      "Maximum number of crash attempts before marking MCP server as ERROR",
+    );
+  },
+
   async getConfig(key: ConfigKey): Promise<string | undefined> {
     const config = await configRepo.getConfig(key);
     return config?.value;

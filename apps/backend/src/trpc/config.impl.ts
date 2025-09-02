@@ -47,6 +47,17 @@ export const configImplementations = {
     return { success: true };
   },
 
+  getMcpMaxAttempts: async (): Promise<number> => {
+    return await configService.getMcpMaxAttempts();
+  },
+
+  setMcpMaxAttempts: async (input: {
+    maxAttempts: number;
+  }): Promise<{ success: boolean }> => {
+    await configService.setMcpMaxAttempts(input.maxAttempts);
+    return { success: true };
+  },
+
   getAllConfigs: async (): Promise<
     Array<{ id: string; value: string; description?: string | null }>
   > => {

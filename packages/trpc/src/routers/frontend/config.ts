@@ -18,6 +18,10 @@ export const createConfigRouter = (implementations: {
   setMcpMaxTotalTimeout: (input: {
     timeout: number;
   }) => Promise<{ success: boolean }>;
+  getMcpMaxAttempts: () => Promise<number>;
+  setMcpMaxAttempts: (input: {
+    maxAttempts: number;
+  }) => Promise<{ success: boolean }>;
   getAllConfigs: () => Promise<
     Array<{ id: string; value: string; description?: string | null }>
   >;
@@ -65,6 +69,16 @@ export const createConfigRouter = (implementations: {
       .input(z.object({ timeout: z.number().min(1000).max(3000000) }))
       .mutation(async ({ input }) => {
         return await implementations.setMcpMaxTotalTimeout(input);
+      }),
+
+    getMcpMaxAttempts: publicProcedure.query(async () => {
+      return await implementations.getMcpMaxAttempts();
+    }),
+
+    setMcpMaxAttempts: protectedProcedure
+      .input(z.object({ maxAttempts: z.number().min(1).max(10) }))
+      .mutation(async ({ input }) => {
+        return await implementations.setMcpMaxAttempts(input);
       }),
 
     getAllConfigs: protectedProcedure.query(async () => {
