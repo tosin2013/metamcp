@@ -113,24 +113,45 @@ export class McpServerPool {
     params: ServerParameters,
     namespaceUuid?: string,
   ): Promise<ConnectedClient | undefined> {
+    console.log(
+      `Creating new connection for server ${params.name} (${params.uuid}) with namespace: ${namespaceUuid || "none"}`,
+    );
+
     const connectedClient = await connectMetaMcpClient(
       params,
-      namespaceUuid
-        ? (exitCode, signal) => {
-            // Handle process crash
-            this.handleServerCrash(
-              params.uuid,
-              namespaceUuid,
-              exitCode,
-              signal,
-            ).catch((error) => {
-              console.error(
-                `Error handling server crash for ${params.uuid} in ${namespaceUuid}:`,
-                error,
-              );
-            });
-          }
-        : undefined,
+      (exitCode, signal) => {
+        console.log(
+          `Crash handler callback called for server ${params.name} (${params.uuid}) with namespace: ${namespaceUuid || "none"}`,
+        );
+
+        // Handle process crash - always set up crash handler
+        if (namespaceUuid) {
+          // If we have a namespace context, use it
+          this.handleServerCrash(
+            params.uuid,
+            namespaceUuid,
+            exitCode,
+            signal,
+          ).catch((error) => {
+            console.error(
+              `Error handling server crash for ${params.uuid} in ${namespaceUuid}:`,
+              error,
+            );
+          });
+        } else {
+          // If no namespace context, still track the crash globally
+          this.handleServerCrashWithoutNamespace(
+            params.uuid,
+            exitCode,
+            signal,
+          ).catch((error) => {
+            console.error(
+              `Error handling server crash for ${params.uuid} (no namespace):`,
+              error,
+            );
+          });
+        }
+      },
     );
     if (!connectedClient) {
       return undefined;
@@ -447,6 +468,34 @@ export class McpServerPool {
     await serverErrorTracker.recordServerCrash(
       serverUuid,
       namespaceUuid,
+      exitCode,
+      signal,
+    );
+
+    // Clean up any existing sessions for this server
+    await this.cleanupServerSessions(serverUuid);
+  }
+
+  /**
+   * Handle server process crash without namespace context
+   * This is used when servers are created without a specific namespace
+   */
+  async handleServerCrashWithoutNamespace(
+    serverUuid: string,
+    exitCode: number | null,
+    signal: string | null,
+  ): Promise<void> {
+    console.warn(
+      `Handling server crash for ${serverUuid} (no namespace context)`,
+    );
+
+    // Record the crash in the error tracker with a global namespace
+    console.log(
+      `Recording crash for server ${serverUuid} with global namespace`,
+    );
+    await serverErrorTracker.recordServerCrash(
+      serverUuid,
+      "global", // Use a special namespace for servers without context
       exitCode,
       signal,
     );

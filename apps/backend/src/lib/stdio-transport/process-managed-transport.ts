@@ -162,6 +162,9 @@ export class ProcessManagedStdioTransport implements Transport {
         // Only emit crash event if this wasn't a clean shutdown
         if (!this._isCleanup && (code !== 0 || signal)) {
           console.warn(`Process crashed with code: ${code}, signal: ${signal}`);
+          console.log(
+            `Calling onprocesscrash handler: ${this.onprocesscrash ? "handler exists" : "no handler"}`,
+          );
           this.onprocesscrash?.(code, signal);
         }
 

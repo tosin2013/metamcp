@@ -28,27 +28,6 @@ export class NamespaceMappingsRepository {
     return updatedMapping;
   }
 
-  async updateServerErrorStatus(input: {
-    namespaceUuid: string;
-    serverUuid: string;
-    errorStatus: "NONE" | "ERROR";
-  }) {
-    const [updatedMapping] = await db
-      .update(namespaceServerMappingsTable)
-      .set({
-        error_status: input.errorStatus,
-      })
-      .where(
-        and(
-          eq(namespaceServerMappingsTable.namespace_uuid, input.namespaceUuid),
-          eq(namespaceServerMappingsTable.mcp_server_uuid, input.serverUuid),
-        ),
-      )
-      .returning();
-
-    return updatedMapping;
-  }
-
   async updateToolStatus(input: NamespaceToolStatusUpdate) {
     const [updatedMapping] = await db
       .update(namespaceToolMappingsTable)

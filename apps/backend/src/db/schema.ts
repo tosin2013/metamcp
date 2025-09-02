@@ -50,6 +50,9 @@ export const mcpServersTable = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
     url: text("url"),
+    error_status: mcpServerErrorStatusEnum("error_status")
+      .notNull()
+      .default(McpServerErrorStatusEnum.Enum.NONE),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -61,6 +64,7 @@ export const mcpServersTable = pgTable(
   (table) => [
     index("mcp_servers_type_idx").on(table.type),
     index("mcp_servers_user_id_idx").on(table.user_id),
+    index("mcp_servers_error_status_idx").on(table.error_status),
     // Allow same name for different users, but unique within user scope (including public)
     unique("mcp_servers_name_user_unique_idx").on(table.name, table.user_id),
     sql`CONSTRAINT mcp_servers_name_regex_check CHECK (
@@ -281,9 +285,6 @@ export const namespaceServerMappingsTable = pgTable(
     status: mcpServerStatusEnum("status")
       .notNull()
       .default(McpServerStatusEnum.Enum.ACTIVE),
-    error_status: mcpServerErrorStatusEnum("error_status")
-      .notNull()
-      .default(McpServerErrorStatusEnum.Enum.NONE),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -296,7 +297,6 @@ export const namespaceServerMappingsTable = pgTable(
       table.mcp_server_uuid,
     ),
     index("namespace_server_mappings_status_idx").on(table.status),
-    index("namespace_server_mappings_error_status_idx").on(table.error_status),
     unique("namespace_server_mappings_unique_idx").on(
       table.namespace_uuid,
       table.mcp_server_uuid,

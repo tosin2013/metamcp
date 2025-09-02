@@ -167,10 +167,11 @@ export const connectMetaMcpClient = async (
         return undefined;
       }
 
-      await client.connect(transport);
-
-      // Set up process crash detection for STDIO transports
+      // Set up process crash detection for STDIO transports BEFORE connecting
       if (transport instanceof ProcessManagedStdioTransport) {
+        console.log(
+          `Setting up crash handler for server ${serverParams.name} (${serverParams.uuid})`,
+        );
         transport.onprocesscrash = (exitCode, signal) => {
           console.warn(
             `Process crashed for server ${serverParams.name} (${serverParams.uuid}): code=${exitCode}, signal=${signal}`,
@@ -178,10 +179,19 @@ export const connectMetaMcpClient = async (
 
           // Notify the pool about the crash
           if (onProcessCrash) {
+            console.log(
+              `Calling onProcessCrash callback for server ${serverParams.name} (${serverParams.uuid})`,
+            );
             onProcessCrash(exitCode, signal);
+          } else {
+            console.warn(
+              `No onProcessCrash callback provided for server ${serverParams.name} (${serverParams.uuid})`,
+            );
           }
         };
       }
+
+      await client.connect(transport);
 
       return {
         client,

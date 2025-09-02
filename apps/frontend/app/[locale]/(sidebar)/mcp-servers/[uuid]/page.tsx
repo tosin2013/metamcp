@@ -111,7 +111,7 @@ export default function McpServerDetailPage({
     ? serverResponse.data
     : undefined;
 
-  // MCP Connection setup - only enable when server data is loaded
+  // MCP Connection setup - only enable when server data is loaded and not in error state
   const connection = useConnection({
     mcpServerUuid: uuid,
     transportType: server?.type || McpServerTypeEnum.Enum.STDIO,
@@ -126,7 +126,7 @@ export default function McpServerDetailPage({
     onStdErrNotification: (notification) => {
       console.error("MCP StdErr:", notification);
     },
-    enabled: Boolean(server && !isLoading),
+    enabled: Boolean(server && !isLoading && server.error_status !== "ERROR"),
   });
 
   // Auto-connect when hook is enabled and not already connected
@@ -135,6 +135,7 @@ export default function McpServerDetailPage({
       connection &&
       server &&
       !isLoading &&
+      server.error_status !== "ERROR" &&
       connection.connectionStatus === "disconnected"
     ) {
       connection.connect();
@@ -155,6 +156,10 @@ export default function McpServerDetailPage({
 
   // Handle manual connect/disconnect
   const handleConnectionToggle = () => {
+    if (server?.error_status === "ERROR") {
+      // Don't allow connection if server is in error state
+      return;
+    }
     if (connection.connectionStatus === "connected") {
       connection.disconnect();
     } else {
@@ -164,6 +169,15 @@ export default function McpServerDetailPage({
 
   // Get connection status display info
   const getConnectionStatusInfo = () => {
+    // If server is in error state, show error status
+    if (server?.error_status === "ERROR") {
+      return {
+        text: t("mcp-servers:detail.serverError"),
+        color: "text-destructive",
+        icon: Server,
+      };
+    }
+
     switch (connection.connectionStatus) {
       case "connected":
         return {
@@ -587,7 +601,24 @@ export default function McpServerDetailPage({
             <h3 className="text-lg font-semibold mb-4">
               {t("mcp-servers:detail.toolsManagement")}
             </h3>
-            {connection.connectionStatus === "connected" ? (
+            {server.error_status === "ERROR" ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-dashed p-8 text-center">
+                  <div className="flex flex-col items-center justify-center mx-auto max-w-md">
+                    <Server className="size-12 text-red-400" />
+                    <h4 className="mt-4 text-lg font-semibold">
+                      {t("mcp-servers:detail.serverErrorTitle")}
+                    </h4>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t("mcp-servers:detail.serverErrorDescription")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("mcp-servers:detail.fixServerErrorToManageTools")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : connection.connectionStatus === "connected" ? (
               <ToolManagement
                 mcpServerUuid={uuid}
                 makeRequest={connection.makeRequest}

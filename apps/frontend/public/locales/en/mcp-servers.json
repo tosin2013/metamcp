@@ -161,12 +161,16 @@
     "showValue": "Show value",
     "mcpConnection": "MCP Connection",
     "connectionError": "Connection Error",
+    "serverError": "Server Error",
     "connecting": "Connecting...",
     "reconnect": "Reconnect",
     "connect": "Connect",
     "connectToManageTools": "Connect to MCP server to manage tools",
     "connectingToServer": "Connecting to MCP server...",
-    "toolsManagement": "Tools Management"
+    "toolsManagement": "Tools Management",
+    "serverErrorTitle": "Server Error",
+    "serverErrorDescription": "This MCP server is currently in an error state and cannot be connected to.",
+    "fixServerErrorToManageTools": "Fix the server error to manage tools"
   },
   "tools": {
     "overview": "Tools Overview",

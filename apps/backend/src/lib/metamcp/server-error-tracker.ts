@@ -1,6 +1,6 @@
 import { McpServerErrorStatusEnum } from "@repo/zod-types";
 
-import { namespaceMappingsRepository } from "../../db/repositories/index";
+import { mcpServersRepository } from "../../db/repositories/index";
 
 export interface ServerCrashInfo {
   serverUuid: string;
@@ -54,6 +54,10 @@ export class ServerErrorTracker {
     exitCode: number | null,
     signal: string | null,
   ): Promise<void> {
+    console.log(
+      `recordServerCrash called for server ${serverUuid} in namespace ${namespaceUuid}`,
+    );
+
     // Get current attempt count
     const currentAttempts =
       this.crashAttempts.get(serverUuid)?.get(namespaceUuid) || 0;
@@ -103,17 +107,23 @@ export class ServerErrorTracker {
   }
 
   /**
-   * Mark a server as ERROR in a specific namespace
+   * Mark a server as ERROR
    */
   private async markServerAsError(
     serverUuid: string,
-    namespaceUuid: string,
+    _namespaceUuid: string,
   ): Promise<void> {
-    await namespaceMappingsRepository.updateServerErrorStatus({
-      namespaceUuid,
-      serverUuid,
-      errorStatus: McpServerErrorStatusEnum.Enum.ERROR,
-    });
+    try {
+      // Update the server-level error status
+      await mcpServersRepository.updateServerErrorStatus({
+        serverUuid,
+        errorStatus: McpServerErrorStatusEnum.Enum.ERROR,
+      });
+
+      console.error(`Server ${serverUuid} marked as ERROR at server level`);
+    } catch (error) {
+      console.error(`Error marking server ${serverUuid} as ERROR:`, error);
+    }
   }
 
   /**
@@ -146,21 +156,18 @@ export class ServerErrorTracker {
   }
 
   /**
-   * Check if a server is in ERROR state for a namespace
+   * Check if a server is in ERROR state
    */
   async isServerInErrorState(
     serverUuid: string,
-    namespaceUuid: string,
+    _namespaceUuid: string,
   ): Promise<boolean> {
     try {
-      const mapping = await namespaceMappingsRepository.findServerMapping(
-        namespaceUuid,
-        serverUuid,
-      );
-      return mapping?.error_status === McpServerErrorStatusEnum.Enum.ERROR;
+      const server = await mcpServersRepository.findByUuid(serverUuid);
+      return server?.error_status === McpServerErrorStatusEnum.Enum.ERROR;
     } catch (error) {
       console.error(
-        `Error checking server error state for ${serverUuid} in ${namespaceUuid}:`,
+        `Error checking server error state for ${serverUuid}:`,
         error,
       );
       return false;
@@ -168,7 +175,7 @@ export class ServerErrorTracker {
   }
 
   /**
-   * Reset error state for a server in a namespace (e.g., after manual recovery)
+   * Reset error state for a server (e.g., after manual recovery)
    */
   async resetServerErrorState(
     serverUuid: string,
@@ -179,18 +186,15 @@ export class ServerErrorTracker {
       this.resetServerAttempts(serverUuid, namespaceUuid);
 
       // Update the database to clear the error status
-      await namespaceMappingsRepository.updateServerErrorStatus({
-        namespaceUuid,
+      await mcpServersRepository.updateServerErrorStatus({
         serverUuid,
         errorStatus: McpServerErrorStatusEnum.Enum.NONE,
       });
 
-      console.log(
-        `Reset error state for server ${serverUuid} in namespace ${namespaceUuid}`,
-      );
+      console.log(`Reset error state for server ${serverUuid}`);
     } catch (error) {
       console.error(
-        `Error resetting error state for server ${serverUuid} in namespace ${namespaceUuid}:`,
+        `Error resetting error state for server ${serverUuid}:`,
         error,
       );
     }

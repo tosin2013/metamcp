@@ -434,6 +434,7 @@ export const DatabaseMcpServerSchema = z.object({
   args: z.array(z.string()),
   env: z.record(z.string()),
   url: z.string().nullable(),
+  error_status: McpServerErrorStatusEnum,
   created_at: z.date(),
   bearerToken: z.string().nullable(),
   user_id: z.string().nullable(),

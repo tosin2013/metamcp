@@ -229,6 +229,21 @@ export class McpServersRepository {
       );
     }
   }
+
+  async updateServerErrorStatus(input: {
+    serverUuid: string;
+    errorStatus: "NONE" | "ERROR";
+  }) {
+    const [updatedServer] = await db
+      .update(mcpServersTable)
+      .set({
+        error_status: input.errorStatus,
+      })
+      .where(eq(mcpServersTable.uuid, input.serverUuid))
+      .returning();
+
+    return updatedServer;
+  }
 }
 
 export const mcpServersRepository = new McpServersRepository();
