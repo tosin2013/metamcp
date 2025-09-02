@@ -16,6 +16,7 @@ import { findActualExecutable } from "spawn-rx";
 
 import mcpProxy from "../../lib/mcp-proxy";
 import { transformDockerUrl } from "../../lib/metamcp/client";
+import { resolveEnvVariables } from "../../lib/metamcp/utils";
 import { ProcessManagedStdioTransport } from "../../lib/stdio-transport/process-managed-transport";
 import { betterAuthMcpMiddleware } from "../../middleware/better-auth-mcp.middleware";
 
@@ -161,7 +162,11 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
     const command = query.command as string;
     const origArgs = shellParseArgs(query.args as string) as string[];
     const queryEnv = query.env ? JSON.parse(query.env as string) : {};
-    const env = { ...process.env, ...defaultEnvironment, ...queryEnv };
+
+    // Resolve environment variable placeholders
+    const resolvedQueryEnv = resolveEnvVariables(queryEnv);
+
+    const env = { ...process.env, ...defaultEnvironment, ...resolvedQueryEnv };
 
     const { cmd, args } = findActualExecutable(command, origArgs);
 
@@ -444,7 +449,12 @@ serverRouter.get("/stdio", async (req, res) => {
         const command = query.command as string;
         const origArgs = shellParseArgs(query.args as string) as string[];
         const queryEnv = query.env ? JSON.parse(query.env as string) : {};
-        const env = { ...process.env, ...defaultEnvironment, ...queryEnv };
+        const resolvedQueryEnv = resolveEnvVariables(queryEnv);
+        const env = {
+          ...process.env,
+          ...defaultEnvironment,
+          ...resolvedQueryEnv,
+        };
         const { cmd, args } = findActualExecutable(command, origArgs);
 
         setStdioCooldown(cmd, args, env);
@@ -485,7 +495,12 @@ serverRouter.get("/stdio", async (req, res) => {
             const command = query.command as string;
             const origArgs = shellParseArgs(query.args as string) as string[];
             const queryEnv = query.env ? JSON.parse(query.env as string) : {};
-            const env = { ...process.env, ...defaultEnvironment, ...queryEnv };
+            const resolvedQueryEnv = resolveEnvVariables(queryEnv);
+            const env = {
+              ...process.env,
+              ...defaultEnvironment,
+              ...resolvedQueryEnv,
+            };
             const { cmd, args } = findActualExecutable(command, origArgs);
 
             setStdioCooldown(cmd, args, env);
