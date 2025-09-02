@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { McpServerSchema, McpServerStatusEnum, McpServerErrorStatusEnum } from "./mcp-servers.zod";
+import {
+  McpServerErrorStatusEnum,
+  McpServerSchema,
+  McpServerStatusEnum,
+} from "./mcp-servers.zod";
 import { ToolSchema, ToolStatusEnum } from "./tools.zod";
 
 // Namespace schema definitions
