@@ -156,9 +156,11 @@ export const connectMetaMcpClient = async (
   onProcessCrash?: (exitCode: number | null, signal: string | null) => void,
 ): Promise<ConnectedClient | undefined> => {
   const waitFor = 5000;
-  
+
   // Get max attempts from server error tracker instead of hardcoding
-  const maxAttempts = serverErrorTracker.getServerMaxAttempts(serverParams.uuid);
+  const maxAttempts = serverErrorTracker.getServerMaxAttempts(
+    serverParams.uuid,
+  );
   let count = 0;
   let retry = true;
 
