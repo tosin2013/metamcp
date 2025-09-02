@@ -1,10 +1,12 @@
 import {
   DatabaseMcpServer,
   McpServerCreateInput,
+  McpServerErrorStatusEnum,
   McpServerUpdateInput,
 } from "@repo/zod-types";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { DatabaseError } from "pg";
+import { z } from "zod";
 
 import { db } from "../index";
 import { mcpServersTable } from "../schema";
@@ -232,7 +234,7 @@ export class McpServersRepository {
 
   async updateServerErrorStatus(input: {
     serverUuid: string;
-    errorStatus: "NONE" | "ERROR";
+    errorStatus: z.infer<typeof McpServerErrorStatusEnum>;
   }) {
     const [updatedServer] = await db
       .update(mcpServersTable)

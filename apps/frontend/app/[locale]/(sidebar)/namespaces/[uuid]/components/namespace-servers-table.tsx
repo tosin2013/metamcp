@@ -1,6 +1,10 @@
 "use client";
 
-import { McpServerTypeEnum, NamespaceServer } from "@repo/zod-types";
+import {
+  McpServerErrorStatusEnum,
+  McpServerTypeEnum,
+  NamespaceServer,
+} from "@repo/zod-types";
 import {
   ColumnDef,
   flexRender,
@@ -244,7 +248,7 @@ export function NamespaceServersTable({
       },
       cell: ({ row }) => {
         const errorStatus = row.getValue("error_status") as string;
-        const hasError = errorStatus === "ERROR";
+        const hasError = errorStatus === McpServerErrorStatusEnum.Enum.ERROR;
         return (
           <div className="px-3 py-2">
             <Badge variant={hasError ? "destructive" : "success"}>
