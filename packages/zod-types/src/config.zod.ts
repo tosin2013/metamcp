@@ -3,6 +3,7 @@ import { z } from "zod";
 // Define config key enum
 export const ConfigKeyEnum = z.enum([
   "DISABLE_SIGNUP",
+  "DISABLE_SSO_SIGNUP",
   "MCP_RESET_TIMEOUT_ON_PROGRESS",
   "MCP_TIMEOUT",
   "MCP_MAX_TOTAL_TIMEOUT",

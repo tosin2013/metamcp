@@ -18,6 +18,21 @@ export const configService = {
     );
   },
 
+  async isSsoSignupDisabled(): Promise<boolean> {
+    const config = await configRepo.getConfig(
+      ConfigKeyEnum.Enum.DISABLE_SSO_SIGNUP,
+    );
+    return config?.value === "true";
+  },
+
+  async setSsoSignupDisabled(disabled: boolean): Promise<void> {
+    await configRepo.setConfig(
+      ConfigKeyEnum.Enum.DISABLE_SSO_SIGNUP,
+      disabled.toString(),
+      "Whether new user signup via SSO/OAuth is disabled",
+    );
+  },
+
   async getMcpResetTimeoutOnProgress(): Promise<boolean> {
     const config = await configRepo.getConfig(
       ConfigKeyEnum.Enum.MCP_RESET_TIMEOUT_ON_PROGRESS,

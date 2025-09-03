@@ -23,6 +23,7 @@ import { trpc } from "@/lib/trpc";
 export default function SettingsPage() {
   const { t } = useTranslations();
   const [isSignupDisabled, setIsSignupDisabled] = useState(false);
+  const [isSsoSignupDisabled, setIsSsoSignupDisabled] = useState(false);
   const [mcpResetTimeoutOnProgress, setMcpResetTimeoutOnProgress] =
     useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -49,6 +50,12 @@ export default function SettingsPage() {
     isLoading: signupLoading,
     refetch: refetchSignup,
   } = trpc.frontend.config.getSignupDisabled.useQuery();
+
+  const {
+    data: ssoSignupDisabled,
+    isLoading: ssoSignupLoading,
+    refetch: refetchSsoSignup,
+  } = trpc.frontend.config.getSsoSignupDisabled.useQuery();
 
   const {
     data: mcpResetTimeoutOnProgressData,
@@ -82,6 +89,17 @@ export default function SettingsPage() {
           refetchSignup();
         } else {
           console.error("Failed to update signup setting");
+        }
+      },
+    });
+
+  const setSsoSignupDisabledMutation =
+    trpc.frontend.config.setSsoSignupDisabled.useMutation({
+      onSuccess: (data) => {
+        if (data.success) {
+          refetchSsoSignup();
+        } else {
+          console.error("Failed to update SSO signup setting");
         }
       },
     });
@@ -138,6 +156,12 @@ export default function SettingsPage() {
       setIsSignupDisabled(signupDisabled);
     }
   }, [signupDisabled]);
+
+  useEffect(() => {
+    if (ssoSignupDisabled !== undefined) {
+      setIsSsoSignupDisabled(ssoSignupDisabled);
+    }
+  }, [ssoSignupDisabled]);
 
   useEffect(() => {
     if (mcpResetTimeoutOnProgressData !== undefined) {
@@ -197,6 +221,24 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSsoSignupToggle = async (checked: boolean) => {
+    setIsSsoSignupDisabled(checked);
+    try {
+      await setSsoSignupDisabledMutation.mutateAsync({ disabled: checked });
+      toast.success(
+        checked
+          ? t("settings:ssoSignupDisabledSuccess")
+          : t("settings:ssoSignupEnabledSuccess"),
+      );
+    } catch (error) {
+      setIsSsoSignupDisabled(!checked);
+      console.error("Failed to update SSO signup setting:", error);
+      toast.error(t("settings:ssoSignupToggleError"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   const handleMcpResetTimeoutToggle = async (checked: boolean) => {
     setMcpResetTimeoutOnProgress(checked);
     try {
@@ -246,6 +288,7 @@ export default function SettingsPage() {
 
   const isLoading =
     signupLoading ||
+    ssoSignupLoading ||
     mcpResetLoading ||
     mcpTimeoutLoading ||
     mcpMaxTotalLoading ||
@@ -297,6 +340,23 @@ export default function SettingsPage() {
                 checked={isSignupDisabled}
                 onCheckedChange={handleSignupToggle}
                 disabled={setSignupDisabledMutation.isPending}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="disable-sso-signup" className="text-base">
+                  {t("settings:disableSsoSignup")}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:disableSsoSignupDescription")}
+                </p>
+              </div>
+              <Switch
+                id="disable-sso-signup"
+                checked={isSsoSignupDisabled}
+                onCheckedChange={handleSsoSignupToggle}
+                disabled={setSsoSignupDisabledMutation.isPending}
               />
             </div>
           </CardContent>

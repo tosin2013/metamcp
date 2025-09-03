@@ -91,12 +91,22 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => {
-          // Check if signup is disabled
+        before: async (user, context) => {
+          // Check if signup is disabled based on the registration method
           const isSignupDisabled = await configService.isSignupDisabled();
-          if (isSignupDisabled) {
+          const isSsoSignupDisabled = await configService.isSsoSignupDisabled();
+
+          // Determine if this is an SSO/OAuth registration by checking if there's an account
+          const isSsoRegistration = context?.account !== undefined;
+
+          if (isSsoRegistration && isSsoSignupDisabled) {
+            throw new Error(
+              "New user registration via SSO/OAuth is currently disabled.",
+            );
+          } else if (!isSsoRegistration && isSignupDisabled) {
             throw new Error("New user registration is currently disabled.");
           }
+
           return { data: user };
         },
       },

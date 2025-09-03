@@ -14,6 +14,17 @@ export const configImplementations = {
     return { success: true };
   },
 
+  getSsoSignupDisabled: async (): Promise<boolean> => {
+    return await configService.isSsoSignupDisabled();
+  },
+
+  setSsoSignupDisabled: async (input: {
+    disabled: boolean;
+  }): Promise<{ success: boolean }> => {
+    await configService.setSsoSignupDisabled(input.disabled);
+    return { success: true };
+  },
+
   getMcpResetTimeoutOnProgress: async (): Promise<boolean> => {
     return await configService.getMcpResetTimeoutOnProgress();
   },
