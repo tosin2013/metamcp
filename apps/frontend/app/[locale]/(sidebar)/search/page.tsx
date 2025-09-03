@@ -1,15 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { SearchSkeleton } from "@/components/skeletons/search-skeleton";
 import { Input } from "@/components/ui/input";
-import { useLocale } from "@/hooks/useLocale";
 import { useTranslations } from "@/hooks/useTranslations";
-import { getLocalizedPath } from "@/lib/i18n";
 import type { PaginatedSearchResult } from "@/types/search";
 
 import CardGrid from "./components/CardGrid";
@@ -19,18 +16,35 @@ const PAGE_SIZE = 6;
 
 function SearchContent() {
   const { t } = useTranslations();
-  const router = useRouter();
-  const locale = useLocale();
   const searchParams = useSearchParams();
-  const query = searchParams.get("query") || "";
-  const offset = parseInt(searchParams.get("offset") || "0");
-  const [searchQuery, setSearchQuery] = useState(query);
+  
+  // Initialize search query from URL on mount (for direct links)
+  const initialQuery = searchParams.get("query") || "";
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Debounce the search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setCurrentPage(1); // Reset to first page when search changes
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Note: We don't update the URL during typing to avoid page refreshes
+  // The search functionality works entirely with local state
+
+  // Calculate offset based on current page
+  const offset = (currentPage - 1) * PAGE_SIZE;
 
   const { data, error, isLoading } = useQuery<PaginatedSearchResult>({
-    queryKey: ["search", query, offset],
+    queryKey: ["search", debouncedQuery, offset],
     queryFn: async () => {
       const res = await fetch(
-        `/service/search?query=${encodeURIComponent(query)}&pageSize=${PAGE_SIZE}&offset=${offset}`,
+        `/service/search?query=${encodeURIComponent(debouncedQuery)}&pageSize=${PAGE_SIZE}&offset=${offset}`,
       );
       if (!res.ok) {
         const errorText = await res.text();
@@ -40,34 +54,23 @@ function SearchContent() {
       }
       return res.json();
     },
+    // Always enabled - show all results when no query, filtered results when there's a query
   });
 
   if (error) console.error("Search error:", error);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery !== query) {
-        const params = new URLSearchParams();
-        if (searchQuery) params.set("query", searchQuery);
-        params.set("offset", "0");
-        const searchPath = getLocalizedPath("/search", locale);
-        router.push(`${searchPath}?${params.toString()}`);
-      }
-    }, 500);
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [searchQuery, query, router, locale]);
-
-  const handlePageChange = (page: number) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("offset", ((page - 1) * PAGE_SIZE).toString());
-    const searchPath = getLocalizedPath("/search", locale);
-    router.push(`${searchPath}?${params.toString()}`);
-  };
-
-  if (isLoading) {
-    return <SearchSkeleton />;
-  }
+  // Memoize pagination info to prevent unnecessary re-renders
+  const paginationInfo = useMemo(() => {
+    if (!data) return null;
+    return {
+      currentPage,
+      totalPages: Math.ceil(data.total / PAGE_SIZE),
+    };
+  }, [data, currentPage]);
 
   return (
     <div className="container mx-auto py-8 space-y-6 flex flex-col items-center">
@@ -87,14 +90,28 @@ function SearchContent() {
             " | You may need a proxy server to access Cloudflare."}
         </div>
       )}
-      {data?.results && <CardGrid items={data.results} />}
+      
+      {/* Results area - show skeleton only here, not the entire component */}
+      {isLoading ? (
+        <SearchSkeleton />
+      ) : (
+        <>
+          {data?.results && Object.keys(data.results).length > 0 && <CardGrid items={data.results} />}
+          
+          {data?.results && Object.keys(data.results).length === 0 && (
+            <div className="text-center text-muted-foreground">
+              {t("search:noResults")}
+            </div>
+          )}
 
-      {data && (
-        <PaginationUi
-          currentPage={Math.floor(offset / PAGE_SIZE) + 1}
-          totalPages={Math.ceil(data.total / PAGE_SIZE)}
-          onPageChange={handlePageChange}
-        />
+          {paginationInfo && paginationInfo.totalPages > 1 && (
+            <PaginationUi
+              currentPage={paginationInfo.currentPage}
+              totalPages={paginationInfo.totalPages}
+              onPageChange={handlePageChange}
+            />
+          )}
+        </>
       )}
     </div>
   );
