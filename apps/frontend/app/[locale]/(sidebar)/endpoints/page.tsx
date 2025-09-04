@@ -81,7 +81,7 @@ export default function EndpointsPage() {
         // Invalidate and refetch the endpoint list, MCP servers list, and API keys list
         utils.frontend.endpoints.list.invalidate();
         utils.frontend.mcpServers.list.invalidate();
-        utils.apiKeys.list.invalidate();
+        utils.frontend.apiKeys.list.invalidate();
       } else {
         // Handle business logic failures
         console.error("Endpoint creation failed:", data.message);

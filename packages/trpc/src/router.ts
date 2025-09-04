@@ -13,10 +13,10 @@ export const createAppRouter = (implementations: {
       endpoints: frontendRouters.endpoints,
       oauth: frontendRouters.oauth,
       tools: frontendRouters.tools,
+      apiKeys: frontendRouters.apiKeys,
       config: frontendRouters.config,
       logs: frontendRouters.logs,
     }),
-    apiKeys: frontendRouters.apiKeys,
   });
 };
 
