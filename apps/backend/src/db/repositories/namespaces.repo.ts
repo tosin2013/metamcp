@@ -15,6 +15,7 @@ import {
   namespaceToolMappingsTable,
   toolsTable,
 } from "../schema";
+import { namespaceMappingsRepository } from "./namespace-mappings.repo";
 
 export class NamespacesRepository {
   async create(input: NamespaceCreateInput): Promise<DatabaseNamespace> {
@@ -298,6 +299,15 @@ export class NamespacesRepository {
 
       // If mcpServerUuids are provided, update the mappings
       if (input.mcpServerUuids) {
+        // Get existing tool mappings to preserve their status
+        const existingToolMappings = await namespaceMappingsRepository.findToolMappingsByNamespace(input.uuid);
+        const existingToolStatusMap = new Map<string, "ACTIVE" | "INACTIVE">();
+        
+        // Create a map of existing tool statuses by tool_uuid
+        existingToolMappings.forEach((mapping) => {
+          existingToolStatusMap.set(mapping.tool_uuid, mapping.status);
+        });
+
         // Delete existing server mappings
         await tx
           .delete(namespaceServerMappingsTable)
@@ -332,7 +342,8 @@ export class NamespacesRepository {
               namespace_uuid: input.uuid,
               tool_uuid: tool.uuid,
               mcp_server_uuid: tool.mcp_server_uuid,
-              status: "ACTIVE" as const,
+              // Preserve existing status if tool was previously mapped, otherwise default to ACTIVE
+              status: existingToolStatusMap.get(tool.uuid) || ("ACTIVE" as const),
             }));
 
             await tx.insert(namespaceToolMappingsTable).values(toolMappings);

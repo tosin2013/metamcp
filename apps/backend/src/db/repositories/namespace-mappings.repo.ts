@@ -74,6 +74,18 @@ export class NamespaceMappingsRepository {
     return mappings.map((mapping) => mapping.namespace_uuid);
   }
 
+  /**
+   * Get all existing tool mappings for a namespace
+   */
+  async findToolMappingsByNamespace(namespaceUuid: string) {
+    const mappings = await db
+      .select()
+      .from(namespaceToolMappingsTable)
+      .where(eq(namespaceToolMappingsTable.namespace_uuid, namespaceUuid));
+
+    return mappings;
+  }
+
   async findToolMapping(
     namespaceUuid: string,
     toolUuid: string,

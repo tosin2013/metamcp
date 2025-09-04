@@ -35,10 +35,7 @@ export async function getMcpServers(
 
     // Always exclude servers with ERROR status (these are crashed servers)
     whereConditions.push(
-      eq(
-        namespaceServerMappingsTable.error_status,
-        McpServerErrorStatusEnum.Enum.NONE,
-      ),
+      eq(mcpServersTable.error_status, McpServerErrorStatusEnum.Enum.NONE),
     );
 
     // Fetch MCP servers for the specific namespace using a join query
@@ -55,7 +52,7 @@ export async function getMcpServers(
         created_at: mcpServersTable.created_at,
         bearerToken: mcpServersTable.bearerToken,
         status: namespaceServerMappingsTable.status,
-        error_status: namespaceServerMappingsTable.error_status,
+        error_status: mcpServersTable.error_status,
       })
       .from(mcpServersTable)
       .innerJoin(
