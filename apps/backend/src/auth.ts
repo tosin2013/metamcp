@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { genericOAuth } from "better-auth/plugins";
+import { genericOAuth, GenericOAuthConfig } from "better-auth/plugins";
 
 import { db } from "./db/index";
 import * as schema from "./db/schema";
@@ -18,11 +18,11 @@ const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
 const BETTER_AUTH_URL = process.env.APP_URL;
 
 // OIDC Provider configuration - optional, only if environment variables are provided
-const oidcProviders = [];
+const oidcProviders: GenericOAuthConfig[] = [];
 
 // Add OIDC provider if configured
 if (process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET) {
-  const oidcConfig = {
+  const oidcConfig: GenericOAuthConfig = {
     providerId: process.env.OIDC_PROVIDER_ID || "oidc",
     clientId: process.env.OIDC_CLIENT_ID,
     clientSecret: process.env.OIDC_CLIENT_SECRET,
