@@ -22,7 +22,7 @@ const oidcProviders = [];
 
 // Add OIDC provider if configured
 if (process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET) {
-  const oidcConfig: any = {
+  const oidcConfig = {
     providerId: process.env.OIDC_PROVIDER_ID || "oidc",
     clientId: process.env.OIDC_CLIENT_ID,
     clientSecret: process.env.OIDC_CLIENT_SECRET,
@@ -96,15 +96,23 @@ export const auth = betterAuth({
           const isSignupDisabled = await configService.isSignupDisabled();
           const isSsoSignupDisabled = await configService.isSsoSignupDisabled();
 
-          // Determine if this is an SSO/OAuth registration by checking if there's an account
-          const isSsoRegistration = context?.account !== undefined;
+          // Determine if this is an SSO/OAuth registration by checking the request path
+          // OAuth/SSO registrations typically come through callback endpoints
+          const isSsoRegistration =
+            context?.path?.includes("/callback/") ||
+            context?.path?.includes("/oauth/") ||
+            context?.path?.includes("/oidc/");
 
-          if (isSsoRegistration && isSsoSignupDisabled) {
-            throw new Error(
-              "New user registration via SSO/OAuth is currently disabled.",
-            );
-          } else if (!isSsoRegistration && isSignupDisabled) {
-            throw new Error("New user registration is currently disabled.");
+          if (isSsoRegistration) {
+            if (isSsoSignupDisabled) {
+              throw new Error(
+                "New user registration via SSO/OAuth is currently disabled.",
+              );
+            }
+          } else {
+            if (isSignupDisabled) {
+              throw new Error("New user registration is currently disabled.");
+            }
           }
 
           return { data: user };
