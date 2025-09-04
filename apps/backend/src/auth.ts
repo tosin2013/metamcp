@@ -33,6 +33,7 @@ if (process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET) {
   };
 
   oidcProviders.push(oidcConfig);
+  console.log(`✓ OIDC Provider configured: ${oidcConfig.providerId}`);
 }
 
 export const auth = betterAuth({
@@ -67,6 +68,19 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false, // Set to true if you want email verification
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      // Allow linking accounts with the same email address
+      allowDifferentEmails: false,
+      // Trusted providers for automatic linking (add your OIDC provider here)
+      trustedProviders: oidcProviders.map((p) => p.providerId),
+      // Allow automatic linking for same email addresses
+      allowSameEmail: true,
+      // Require email verification for account linking
+      requireEmailVerification: false,
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
