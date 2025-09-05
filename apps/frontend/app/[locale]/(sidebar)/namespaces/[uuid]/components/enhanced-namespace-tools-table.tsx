@@ -206,10 +206,10 @@ export function EnhancedNamespaceToolsTable({
         }
       }
 
-      // Check if the server for this tool is active
+      // Check if the server for this tool is explicitly inactive
       const serverStatus = serverStatusMap.get(serverName);
-      if (serverStatus !== "ACTIVE") {
-        // Skip tools from inactive servers
+      if (serverStatus === "INACTIVE") {
+        // Skip tools from explicitly inactive servers
         return;
       }
 
