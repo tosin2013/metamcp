@@ -4,7 +4,7 @@ import { McpServerTypeEnum } from "@repo/zod-types";
 import { ArrowLeft, Calendar, Edit, Hash, Plug, Server } from "lucide-react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EditNamespace } from "@/components/edit-namespace";
@@ -41,9 +41,6 @@ export default function NamespaceDetailPage({
 
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
-  const [sessionInitializing, setSessionInitializing] =
-    useState<boolean>(false);
-  const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastToggleTimeRef = useRef<number>(0);
 
   // Get tRPC utils for cache invalidation
@@ -111,15 +108,6 @@ export default function NamespaceDetailPage({
     enabled: Boolean(namespace && !isLoading),
   });
 
-  // Force reset session initialization state
-  const resetSessionInitialization = useCallback(() => {
-    if (sessionTimeoutRef.current) {
-      clearTimeout(sessionTimeoutRef.current);
-      sessionTimeoutRef.current = null;
-    }
-    setSessionInitializing(false);
-  }, []);
-
   // Auto-connect when hook is enabled and not already connected
   useEffect(() => {
     if (
@@ -131,47 +119,6 @@ export default function NamespaceDetailPage({
       connection.connect();
     }
   }, [namespace, connection, isLoading]);
-
-  // Track when session initialization is complete
-  useEffect(() => {
-    if (sessionInitializing && connection.connectionStatus === "connected") {
-      // Session initialization is complete when connection is established
-      // Add a small delay to ensure tools are loaded, then clear the timeout
-      const timer = setTimeout(() => {
-        // Clear the main timeout
-        if (sessionTimeoutRef.current) {
-          clearTimeout(sessionTimeoutRef.current);
-          sessionTimeoutRef.current = null;
-        }
-        setSessionInitializing(false);
-      }, 2000); // Give tools more time to load after connection is established
-
-      return () => clearTimeout(timer);
-    }
-
-    // Handle connection errors - reset session initialization
-    if (
-      sessionInitializing &&
-      (connection.connectionStatus === "error" ||
-        connection.connectionStatus === "error-connecting-to-proxy")
-    ) {
-      console.warn(
-        "Connection error during session initialization, resetting state",
-      );
-      resetSessionInitialization();
-    }
-  }, [
-    sessionInitializing,
-    connection.connectionStatus,
-    resetSessionInitialization,
-  ]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      clearSessionTimeout();
-    };
-  }, []);
 
   // Handle delete namespace
   const handleDeleteNamespace = async () => {
@@ -197,15 +144,7 @@ export default function NamespaceDetailPage({
     }
   };
 
-  // Clear any existing session timeout
-  const clearSessionTimeout = () => {
-    if (sessionTimeoutRef.current) {
-      clearTimeout(sessionTimeoutRef.current);
-      sessionTimeoutRef.current = null;
-    }
-  };
-
-  // Handle server status change - this triggers session initialization
+  // Handle server status change - backend handles server pool invalidation automatically
   const handleServerStatusChange = () => {
     const now = Date.now();
     const timeSinceLastToggle = now - lastToggleTimeRef.current;
@@ -220,24 +159,11 @@ export default function NamespaceDetailPage({
 
     lastToggleTimeRef.current = now;
 
-    // Clear any existing timeout
-    clearSessionTimeout();
-
-    setSessionInitializing(true);
-
-    // Set a maximum timeout for session initialization (15 seconds)
-    sessionTimeoutRef.current = setTimeout(() => {
-      console.warn("Session initialization timed out after 15 seconds");
-      toast.warning(t("namespaces:detail.sessionInitializationTimeout"), {
-        description: t(
-          "namespaces:detail.sessionInitializationTimeoutDescription",
-        ),
-      });
-      setSessionInitializing(false);
-      sessionTimeoutRef.current = null;
-    }, 15000);
-
-    handleConnectionRefresh();
+    // No need to refresh connection - backend handles server pool invalidation
+    // This prevents unnecessary reinitialization of all MCP servers
+    console.log(
+      "Server status changed - backend will handle server pool invalidation",
+    );
   };
 
   // Handle connection refresh (disconnect and reconnect to pick up server changes)
@@ -510,26 +436,12 @@ export default function NamespaceDetailPage({
                 variant="outline"
                 size="sm"
                 onClick={handleConnectionToggle}
-                disabled={
-                  connection.connectionStatus === "connecting" ||
-                  sessionInitializing
-                }
+                disabled={connection.connectionStatus === "connecting"}
               >
-                {sessionInitializing
-                  ? t("namespaces:detail.initializing")
-                  : connection.connectionStatus === "connected"
-                    ? t("namespaces:detail.reconnect")
-                    : t("namespaces:detail.connect")}
+                {connection.connectionStatus === "connected"
+                  ? t("namespaces:detail.reconnect")
+                  : t("namespaces:detail.connect")}
               </Button>
-              {sessionInitializing && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={resetSessionInitialization}
-                >
-                  {t("namespaces:detail.forceReset")}
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -649,7 +561,6 @@ export default function NamespaceDetailPage({
             servers={namespace.servers}
             namespaceUuid={namespace.uuid}
             onServerStatusChange={handleServerStatusChange}
-            sessionInitializing={sessionInitializing}
           />
         </div>
 
@@ -663,22 +574,18 @@ export default function NamespaceDetailPage({
               servers={namespace.servers}
               namespaceUuid={namespace.uuid}
               makeRequest={connection.makeRequest}
-              sessionInitializing={sessionInitializing}
             />
           ) : (
             <div className="space-y-4">
               <NamespaceToolManagement
                 servers={namespace.servers}
                 namespaceUuid={namespace.uuid}
-                sessionInitializing={sessionInitializing}
               />
               <div className="flex justify-center">
                 <div className="text-sm text-muted-foreground">
-                  {sessionInitializing
-                    ? t("namespaces:detail.initializingSession")
-                    : connection.connectionStatus === "connecting"
-                      ? t("namespaces:detail.connectingToMetaMcp")
-                      : t("namespaces:detail.connectToMetaMcpToEnable")}
+                  {connection.connectionStatus === "connecting"
+                    ? t("namespaces:detail.connectingToMetaMcp")
+                    : t("namespaces:detail.connectToMetaMcpToEnable")}
                 </div>
               </div>
             </div>
