@@ -41,6 +41,8 @@ export default function NamespaceDetailPage({
 
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
+  const [sessionInitializing, setSessionInitializing] =
+    useState<boolean>(false);
 
   // Get tRPC utils for cache invalidation
   const utils = trpc.useUtils();
@@ -119,6 +121,19 @@ export default function NamespaceDetailPage({
     }
   }, [namespace, connection, isLoading]);
 
+  // Track when session initialization is complete
+  useEffect(() => {
+    if (sessionInitializing && connection.connectionStatus === "connected") {
+      // Session initialization is complete when connection is established
+      // We'll add a small delay to ensure tools are loaded
+      const timer = setTimeout(() => {
+        setSessionInitializing(false);
+      }, 1000); // Give tools time to load after connection is established
+
+      return () => clearTimeout(timer);
+    }
+  }, [sessionInitializing, connection.connectionStatus]);
+
   // Handle delete namespace
   const handleDeleteNamespace = async () => {
     deleteMutation.mutate({ uuid });
@@ -141,6 +156,12 @@ export default function NamespaceDetailPage({
     } else {
       connection.connect();
     }
+  };
+
+  // Handle server status change - this triggers session initialization
+  const handleServerStatusChange = () => {
+    setSessionInitializing(true);
+    handleConnectionRefresh();
   };
 
   // Handle connection refresh (disconnect and reconnect to pick up server changes)
@@ -413,11 +434,16 @@ export default function NamespaceDetailPage({
                 variant="outline"
                 size="sm"
                 onClick={handleConnectionToggle}
-                disabled={connection.connectionStatus === "connecting"}
+                disabled={
+                  connection.connectionStatus === "connecting" ||
+                  sessionInitializing
+                }
               >
-                {connection.connectionStatus === "connected"
-                  ? t("namespaces:detail.reconnect")
-                  : t("namespaces:detail.connect")}
+                {sessionInitializing
+                  ? t("namespaces:detail.initializing")
+                  : connection.connectionStatus === "connected"
+                    ? t("namespaces:detail.reconnect")
+                    : t("namespaces:detail.connect")}
               </Button>
             </div>
           </div>
@@ -537,7 +563,8 @@ export default function NamespaceDetailPage({
           <NamespaceServersTable
             servers={namespace.servers}
             namespaceUuid={namespace.uuid}
-            onServerStatusChange={handleConnectionRefresh}
+            onServerStatusChange={handleServerStatusChange}
+            sessionInitializing={sessionInitializing}
           />
         </div>
 
@@ -551,18 +578,22 @@ export default function NamespaceDetailPage({
               servers={namespace.servers}
               namespaceUuid={namespace.uuid}
               makeRequest={connection.makeRequest}
+              sessionInitializing={sessionInitializing}
             />
           ) : (
             <div className="space-y-4">
               <NamespaceToolManagement
                 servers={namespace.servers}
                 namespaceUuid={namespace.uuid}
+                sessionInitializing={sessionInitializing}
               />
               <div className="flex justify-center">
                 <div className="text-sm text-muted-foreground">
-                  {connection.connectionStatus === "connecting"
-                    ? t("namespaces:detail.connectingToMetaMcp")
-                    : t("namespaces:detail.connectToMetaMcpToEnable")}
+                  {sessionInitializing
+                    ? t("namespaces:detail.initializingSession")
+                    : connection.connectionStatus === "connecting"
+                      ? t("namespaces:detail.connectingToMetaMcp")
+                      : t("namespaces:detail.connectToMetaMcpToEnable")}
                 </div>
               </div>
             </div>

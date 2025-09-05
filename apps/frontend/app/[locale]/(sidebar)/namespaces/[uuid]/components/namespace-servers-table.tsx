@@ -54,12 +54,14 @@ interface NamespaceServersTableProps {
   servers: NamespaceServer[];
   namespaceUuid: string;
   onServerStatusChange?: () => void; // Callback for when server status changes
+  sessionInitializing?: boolean; // Whether session initialization is in progress
 }
 
 export function NamespaceServersTable({
   servers,
   namespaceUuid,
   onServerStatusChange,
+  sessionInitializing = false,
 }: NamespaceServersTableProps) {
   const router = useRouter();
   const { t } = useTranslations();
@@ -124,6 +126,11 @@ export function NamespaceServersTable({
     });
 
   const handleStatusToggle = (serverUuid: string, currentStatus: string) => {
+    // Don't allow toggles during session initialization
+    if (sessionInitializing || updateServerStatusMutation.isPending) {
+      return;
+    }
+
     const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
 
     // Optimistic update: immediately update the UI
@@ -220,7 +227,7 @@ export function NamespaceServersTable({
       cell: ({ row }) => {
         const server = row.original;
         const isActive = server.status === "ACTIVE";
-        const isUpdating = updateServerStatusMutation.isPending;
+        const isDisabled = sessionInitializing || updateServerStatusMutation.isPending;
 
         return (
           <div className="px-3 py-2">
@@ -230,7 +237,7 @@ export function NamespaceServersTable({
                 onCheckedChange={() =>
                   handleStatusToggle(server.uuid, server.status)
                 }
-                disabled={isUpdating}
+                disabled={isDisabled}
                 aria-label={t("namespaces:serversTable.toggleStatus", {
                   name: server.name,
                 })}
