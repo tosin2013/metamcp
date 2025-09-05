@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,7 @@ export function NamespaceServersTable({
     },
   ]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const lastToggleTimeRef = useRef<number>(0);
 
   // TRPC utils for invalidating queries
   const utils = trpc.useUtils();
@@ -130,6 +131,19 @@ export function NamespaceServersTable({
     if (sessionInitializing || updateServerStatusMutation.isPending) {
       return;
     }
+
+    const now = Date.now();
+    const timeSinceLastToggle = now - lastToggleTimeRef.current;
+    
+    // Prevent rapid successive toggles (minimum 1 second between toggles)
+    if (timeSinceLastToggle < 1000) {
+      toast.warning(t("namespaces:serversTable.toggleTooFast"), {
+        description: t("namespaces:serversTable.toggleTooFastDescription"),
+      });
+      return;
+    }
+    
+    lastToggleTimeRef.current = now;
 
     const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
 

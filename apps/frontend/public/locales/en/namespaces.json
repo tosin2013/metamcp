@@ -80,8 +80,15 @@
     "connecting": "Connecting...",
     "reconnect": "Reconnect",
     "connect": "Connect",
+    "initializing": "Initializing...",
     "connectingToMetaMcp": "Connecting to MetaMCP...",
     "connectToMetaMcpToEnable": "Connect to MetaMCP to enable enhanced tool management",
+    "initializingSession": "Initializing session...",
+    "sessionInitializationTimeout": "Session Initialization Timeout",
+    "sessionInitializationTimeoutDescription": "Session initialization took too long and was automatically reset. You can try again or use the force reset button.",
+    "toggleTooFast": "Toggle Too Fast",
+    "toggleTooFastDescription": "Please wait before toggling again to allow the session to initialize properly.",
+    "forceReset": "Force Reset",
     "anErrorOccurredWhileDeleting": "An error occurred while deleting the namespace"
   },
   "enhancedToolsTable": {
@@ -150,6 +157,8 @@
     "viewDetails": "View details",
     "openInNewTab": "Open in new tab",
     "toggleStatus": "Toggle {{name}} status",
+    "toggleTooFast": "Toggle Too Fast",
+    "toggleTooFastDescription": "Please wait before toggling this server again to prevent conflicts.",
     "errorStatus": "Error Status",
     "error": "Error",
     "noError": "No Error"
@@ -162,6 +171,7 @@
     "saved": "saved",
     "new": "new",
     "refreshTools": "Refresh Tools",
+    "initializing": "Initializing...",
     "noToolsAvailable": "No Tools Available",
     "noToolsDescription": "No tools have been found from MetaMCP or saved to this namespace yet. Connect to MetaMCP and refresh to discover tools from your servers.",
     "toolsRefreshed": "Tools refreshed successfully",

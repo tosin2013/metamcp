@@ -4,7 +4,7 @@ import { McpServerTypeEnum } from "@repo/zod-types";
 import { ArrowLeft, Calendar, Edit, Hash, Plug, Server } from "lucide-react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EditNamespace } from "@/components/edit-namespace";
@@ -43,6 +43,8 @@ export default function NamespaceDetailPage({
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [sessionInitializing, setSessionInitializing] =
     useState<boolean>(false);
+  const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastToggleTimeRef = useRef<number>(0);
 
   // Get tRPC utils for cache invalidation
   const utils = trpc.useUtils();
@@ -109,6 +111,15 @@ export default function NamespaceDetailPage({
     enabled: Boolean(namespace && !isLoading),
   });
 
+  // Force reset session initialization state
+  const resetSessionInitialization = useCallback(() => {
+    if (sessionTimeoutRef.current) {
+      clearTimeout(sessionTimeoutRef.current);
+      sessionTimeoutRef.current = null;
+    }
+    setSessionInitializing(false);
+  }, []);
+
   // Auto-connect when hook is enabled and not already connected
   useEffect(() => {
     if (
@@ -125,14 +136,42 @@ export default function NamespaceDetailPage({
   useEffect(() => {
     if (sessionInitializing && connection.connectionStatus === "connected") {
       // Session initialization is complete when connection is established
-      // We'll add a small delay to ensure tools are loaded
+      // Add a small delay to ensure tools are loaded, then clear the timeout
       const timer = setTimeout(() => {
+        // Clear the main timeout
+        if (sessionTimeoutRef.current) {
+          clearTimeout(sessionTimeoutRef.current);
+          sessionTimeoutRef.current = null;
+        }
         setSessionInitializing(false);
-      }, 1000); // Give tools time to load after connection is established
+      }, 2000); // Give tools more time to load after connection is established
 
       return () => clearTimeout(timer);
     }
-  }, [sessionInitializing, connection.connectionStatus]);
+
+    // Handle connection errors - reset session initialization
+    if (
+      sessionInitializing &&
+      (connection.connectionStatus === "error" ||
+        connection.connectionStatus === "error-connecting-to-proxy")
+    ) {
+      console.warn(
+        "Connection error during session initialization, resetting state",
+      );
+      resetSessionInitialization();
+    }
+  }, [
+    sessionInitializing,
+    connection.connectionStatus,
+    resetSessionInitialization,
+  ]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      clearSessionTimeout();
+    };
+  }, []);
 
   // Handle delete namespace
   const handleDeleteNamespace = async () => {
@@ -158,9 +197,46 @@ export default function NamespaceDetailPage({
     }
   };
 
+  // Clear any existing session timeout
+  const clearSessionTimeout = () => {
+    if (sessionTimeoutRef.current) {
+      clearTimeout(sessionTimeoutRef.current);
+      sessionTimeoutRef.current = null;
+    }
+  };
+
   // Handle server status change - this triggers session initialization
   const handleServerStatusChange = () => {
+    const now = Date.now();
+    const timeSinceLastToggle = now - lastToggleTimeRef.current;
+
+    // Prevent rapid successive toggles (minimum 2 seconds between toggles)
+    if (timeSinceLastToggle < 2000) {
+      toast.warning(t("namespaces:detail.toggleTooFast"), {
+        description: t("namespaces:detail.toggleTooFastDescription"),
+      });
+      return;
+    }
+
+    lastToggleTimeRef.current = now;
+
+    // Clear any existing timeout
+    clearSessionTimeout();
+
     setSessionInitializing(true);
+
+    // Set a maximum timeout for session initialization (15 seconds)
+    sessionTimeoutRef.current = setTimeout(() => {
+      console.warn("Session initialization timed out after 15 seconds");
+      toast.warning(t("namespaces:detail.sessionInitializationTimeout"), {
+        description: t(
+          "namespaces:detail.sessionInitializationTimeoutDescription",
+        ),
+      });
+      setSessionInitializing(false);
+      sessionTimeoutRef.current = null;
+    }, 15000);
+
     handleConnectionRefresh();
   };
 
@@ -445,6 +521,15 @@ export default function NamespaceDetailPage({
                     ? t("namespaces:detail.reconnect")
                     : t("namespaces:detail.connect")}
               </Button>
+              {sessionInitializing && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={resetSessionInitialization}
+                >
+                  {t("namespaces:detail.forceReset")}
+                </Button>
+              )}
             </div>
           </div>
         </div>
