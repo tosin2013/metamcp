@@ -129,12 +129,29 @@ export default function NamespaceDetailPage({
     setEditDialogOpen(false);
     // The EditNamespace component already handles cache invalidation
     // So we just need to close the dialog
+
+    // Refresh the MetaMCP connection to pick up server changes
+    handleConnectionRefresh();
   };
 
   // Handle manual connect/disconnect
   const handleConnectionToggle = () => {
     if (connection.connectionStatus === "connected") {
       connection.disconnect();
+    } else {
+      connection.connect();
+    }
+  };
+
+  // Handle connection refresh (disconnect and reconnect to pick up server changes)
+  const handleConnectionRefresh = () => {
+    if (connection.connectionStatus === "connected") {
+      connection.disconnect().then(() => {
+        // Small delay to ensure clean disconnect before reconnecting
+        setTimeout(() => {
+          connection.connect();
+        }, 100);
+      });
     } else {
       connection.connect();
     }
@@ -520,6 +537,7 @@ export default function NamespaceDetailPage({
           <NamespaceServersTable
             servers={namespace.servers}
             namespaceUuid={namespace.uuid}
+            onServerStatusChange={handleConnectionRefresh}
           />
         </div>
 

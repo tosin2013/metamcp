@@ -53,11 +53,13 @@ import { trpc } from "@/lib/trpc";
 interface NamespaceServersTableProps {
   servers: NamespaceServer[];
   namespaceUuid: string;
+  onServerStatusChange?: () => void; // Callback for when server status changes
 }
 
 export function NamespaceServersTable({
   servers,
   namespaceUuid,
+  onServerStatusChange,
 }: NamespaceServersTableProps) {
   const router = useRouter();
   const { t } = useTranslations();
@@ -106,6 +108,11 @@ export function NamespaceServersTable({
             };
           },
         );
+        
+        // Trigger connection refresh callback
+        if (onServerStatusChange) {
+          onServerStatusChange();
+        }
       },
       onError: (error) => {
         toast.error(t("namespaces:serversTable.failedToUpdateServerStatus"), {
