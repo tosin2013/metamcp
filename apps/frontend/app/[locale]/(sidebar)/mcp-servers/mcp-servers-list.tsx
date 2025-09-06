@@ -1,6 +1,10 @@
 "use client";
 
-import { McpServer, McpServerTypeEnum } from "@repo/zod-types";
+import {
+  McpServer,
+  McpServerErrorStatusEnum,
+  McpServerTypeEnum,
+} from "@repo/zod-types";
 import {
   ColumnDef,
   flexRender,
@@ -184,6 +188,34 @@ export function McpServersList({ onRefresh }: McpServersListProps) {
         return (
           <div className="px-3 py-2">
             <Badge variant="info">{type.toUpperCase()}</Badge>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "error_status",
+      size: 120,
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            {t("mcp-servers:list.errorStatus")}
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const errorStatus = row.getValue("error_status") as string;
+        const hasError = errorStatus === McpServerErrorStatusEnum.Enum.ERROR;
+        return (
+          <div className="px-3 py-2">
+            <Badge variant={hasError ? "destructive" : "success"}>
+              {hasError
+                ? t("mcp-servers:list.error")
+                : t("mcp-servers:list.noError")}
+            </Badge>
           </div>
         );
       },

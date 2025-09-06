@@ -127,7 +127,10 @@
     "args": "Args: {{args}}",
     "url": "URL: {{url}}",
     "envVars": "Env: {{count}} vars",
-    "streamableHttp": "STREAMABLE_HTTP"
+    "streamableHttp": "STREAMABLE_HTTP",
+    "errorStatus": "Error Status",
+    "error": "Error",
+    "noError": "No Error"
   },
   "detail": {
     "backToServers": "Back to MCP Servers",
@@ -143,6 +146,9 @@
     "uuid": "UUID",
     "type": "Type",
     "created": "Created",
+    "errorStatus": "Error Status",
+    "error": "Error",
+    "noError": "No Error",
     "configuration": "Configuration",
     "command": "Command",
     "arguments": "Arguments",
@@ -155,12 +161,16 @@
     "showValue": "Show value",
     "mcpConnection": "MCP Connection",
     "connectionError": "Connection Error",
+    "serverError": "Server Error",
     "connecting": "Connecting...",
     "reconnect": "Reconnect",
     "connect": "Connect",
     "connectToManageTools": "Connect to MCP server to manage tools",
     "connectingToServer": "Connecting to MCP server...",
-    "toolsManagement": "Tools Management"
+    "toolsManagement": "Tools Management",
+    "serverErrorTitle": "Server Error",
+    "serverErrorDescription": "This MCP server is currently in an error state and cannot be connected to.",
+    "fixServerErrorToManageTools": "Fix the server error to manage tools"
   },
   "tools": {
     "overview": "Tools Overview",
@@ -198,4 +208,4 @@
     "failedToFetchTools": "Failed to fetch tools from MCP server",
     "failedToSaveTools": "Failed to save tools"
   }
-} 
+}

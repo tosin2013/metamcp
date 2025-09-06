@@ -8,6 +8,10 @@ export const createConfigRouter = (implementations: {
   setSignupDisabled: (input: {
     disabled: boolean;
   }) => Promise<{ success: boolean }>;
+  getSsoSignupDisabled: () => Promise<boolean>;
+  setSsoSignupDisabled: (input: {
+    disabled: boolean;
+  }) => Promise<{ success: boolean }>;
   getMcpResetTimeoutOnProgress: () => Promise<boolean>;
   setMcpResetTimeoutOnProgress: (input: {
     enabled: boolean;
@@ -17,6 +21,10 @@ export const createConfigRouter = (implementations: {
   getMcpMaxTotalTimeout: () => Promise<number>;
   setMcpMaxTotalTimeout: (input: {
     timeout: number;
+  }) => Promise<{ success: boolean }>;
+  getMcpMaxAttempts: () => Promise<number>;
+  setMcpMaxAttempts: (input: {
+    maxAttempts: number;
   }) => Promise<{ success: boolean }>;
   getAllConfigs: () => Promise<
     Array<{ id: string; value: string; description?: string | null }>
@@ -35,6 +43,16 @@ export const createConfigRouter = (implementations: {
       .input(z.object({ disabled: z.boolean() }))
       .mutation(async ({ input }) => {
         return await implementations.setSignupDisabled(input);
+      }),
+
+    getSsoSignupDisabled: publicProcedure.query(async () => {
+      return await implementations.getSsoSignupDisabled();
+    }),
+
+    setSsoSignupDisabled: protectedProcedure
+      .input(z.object({ disabled: z.boolean() }))
+      .mutation(async ({ input }) => {
+        return await implementations.setSsoSignupDisabled(input);
       }),
 
     getMcpResetTimeoutOnProgress: publicProcedure.query(async () => {
@@ -65,6 +83,16 @@ export const createConfigRouter = (implementations: {
       .input(z.object({ timeout: z.number().min(1000).max(3000000) }))
       .mutation(async ({ input }) => {
         return await implementations.setMcpMaxTotalTimeout(input);
+      }),
+
+    getMcpMaxAttempts: publicProcedure.query(async () => {
+      return await implementations.getMcpMaxAttempts();
+    }),
+
+    setMcpMaxAttempts: protectedProcedure
+      .input(z.object({ maxAttempts: z.number().min(1).max(10) }))
+      .mutation(async ({ input }) => {
+        return await implementations.setMcpMaxAttempts(input);
       }),
 
     getAllConfigs: protectedProcedure.query(async () => {

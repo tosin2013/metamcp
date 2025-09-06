@@ -260,6 +260,7 @@ For more details and alternative approaches, see [issue #76](https://github.com/
 - 🔑 **API key authentication** for external access via `Authorization: Bearer <api-key>` header
 - 🪪 **MCP OAuth**: Exposed endpoints have options to use standard OAuth in MCP Spec 2025-06-18, easy to connect.
 - 🏢 **Multi-tenancy**: Designed for organizations to deploy on their own machines. Supports both private and public access scopes. Users can create MCPs, namespaces, endpoints, and API keys for themselves or for everyone. Public API keys cannot access private MetaMCPs.
+- ⚙️ **Separate Registration Controls**: Administrators can independently control UI registration and SSO/OAuth registration through the settings page, allowing for flexible enterprise deployment scenarios.
 
 ## 🔗 OpenID Connect (OIDC) Provider Support
 
@@ -303,6 +304,34 @@ MetaMCP has been tested with popular OIDC providers:
 Once configured, users will see a **"Sign in with OIDC"** button on the login page alongside the email/password form. The authentication flow automatically creates new users on first login.
 
 For more detailed configuration examples and troubleshooting, see **[CONTRIBUTING.md](CONTRIBUTING.md#openid-connect-oidc-provider-setup)**.
+
+## ⚙️ Registration Controls
+
+MetaMCP provides **separate controls** for different registration methods, allowing administrators to fine-tune user access policies for enterprise deployments.
+
+### 🎛️ **Available Controls**
+
+- **UI Registration**: Controls whether users can create accounts via the registration form
+- **SSO Registration**: Controls whether users can create accounts via SSO/OAuth providers (OIDC, etc.)
+
+### 🏢 **Enterprise Use Cases**
+
+This separation enables common enterprise scenarios:
+
+- **Block UI registration, allow SSO**: Prevent manual signups while allowing corporate SSO users
+- **Block SSO registration, allow UI**: Allow manual signups while restricting SSO access
+- **Block both**: Completely disable new user registration
+- **Allow both**: Default behavior for open deployments
+
+### 🛠️ **Configuration**
+
+Access the **Settings** page in the MetaMCP admin interface to configure these controls:
+
+1. Navigate to **Settings** → **Authentication Settings**
+2. Toggle **"Disable UI Registration"** to control form-based signups
+3. Toggle **"Disable SSO Registration"** to control OAuth/OIDC signups
+
+Both controls work independently, giving you full flexibility over your registration policy.
 
 ## 🌐 Custom Deployment and SSE conf for Nginx
 

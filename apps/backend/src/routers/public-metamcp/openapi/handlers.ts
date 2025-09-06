@@ -39,6 +39,7 @@ export const createOriginalListToolsHandler = (
           context.sessionId,
           mcpServerUuid,
           params,
+          context.namespaceUuid,
         );
         if (!session) return;
 
@@ -117,6 +118,7 @@ export const createOriginalCallToolHandler = (): CallToolHandler => {
         context.sessionId,
         mcpServerUuid,
         params,
+        context.namespaceUuid,
       );
       if (!session) continue;
 

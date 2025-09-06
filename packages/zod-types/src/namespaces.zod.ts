@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { McpServerSchema, McpServerStatusEnum } from "./mcp-servers.zod";
+import {
+  McpServerErrorStatusEnum,
+  McpServerSchema,
+  McpServerStatusEnum,
+} from "./mcp-servers.zod";
 import { ToolSchema, ToolStatusEnum } from "./tools.zod";
 
 // Namespace schema definitions
@@ -41,6 +45,7 @@ export const NamespaceSchema = z.object({
 // Server within namespace schema - extends McpServerSchema with namespace-specific status
 export const NamespaceServerSchema = McpServerSchema.extend({
   status: McpServerStatusEnum,
+  error_status: McpServerErrorStatusEnum.optional(),
 });
 
 // Tool within namespace schema - extends ToolSchema with namespace-specific status and server info

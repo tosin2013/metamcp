@@ -85,6 +85,7 @@ interface EnhancedNamespaceToolsTableProps {
     name: string;
     status: string;
   }>;
+  sessionInitializing?: boolean;
 }
 
 type SortField =
@@ -103,6 +104,7 @@ export function EnhancedNamespaceToolsTable({
   onRefreshTools,
   namespaceUuid,
   servers,
+  sessionInitializing = false,
 }: EnhancedNamespaceToolsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -206,10 +208,10 @@ export function EnhancedNamespaceToolsTable({
         }
       }
 
-      // Check if the server for this tool is active
+      // Check if the server for this tool is explicitly inactive
       const serverStatus = serverStatusMap.get(serverName);
-      if (serverStatus !== "ACTIVE") {
-        // Skip tools from inactive servers
+      if (serverStatus === "INACTIVE") {
+        // Skip tools from explicitly inactive servers
         return;
       }
 
@@ -249,6 +251,11 @@ export function EnhancedNamespaceToolsTable({
   const handleStatusToggle = async (tool: EnhancedNamespaceTool) => {
     if (!tool.sources.saved || !tool.uuid || !tool.serverUuid) {
       toast.error(t("namespaces:enhancedToolsTable.cannotToggleStatus"));
+      return;
+    }
+
+    // Don't allow toggles during session initialization
+    if (sessionInitializing || updateToolStatusMutation.isPending) {
       return;
     }
 
@@ -596,7 +603,8 @@ export function EnhancedNamespaceToolsTable({
                 const toolId = getToolId(tool);
                 const isExpanded = expandedRows.has(toolId);
                 const parameters = getToolParameters(tool);
-                const isToggling = updateToolStatusMutation.isPending;
+                const isToggling =
+                  sessionInitializing || updateToolStatusMutation.isPending;
 
                 return (
                   <React.Fragment key={toolId}>

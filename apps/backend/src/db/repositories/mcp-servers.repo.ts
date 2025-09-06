@@ -1,10 +1,12 @@
 import {
   DatabaseMcpServer,
   McpServerCreateInput,
+  McpServerErrorStatusEnum,
   McpServerUpdateInput,
 } from "@repo/zod-types";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { DatabaseError } from "pg";
+import { z } from "zod";
 
 import { db } from "../index";
 import { mcpServersTable } from "../schema";
@@ -228,6 +230,21 @@ export class McpServersRepository {
         "Failed to bulk create MCP servers. Please check your input and try again.",
       );
     }
+  }
+
+  async updateServerErrorStatus(input: {
+    serverUuid: string;
+    errorStatus: z.infer<typeof McpServerErrorStatusEnum>;
+  }) {
+    const [updatedServer] = await db
+      .update(mcpServersTable)
+      .set({
+        error_status: input.errorStatus,
+      })
+      .where(eq(mcpServersTable.uuid, input.serverUuid))
+      .returning();
+
+    return updatedServer;
   }
 }
 

@@ -127,7 +127,10 @@
     "args": "参数：{{args}}",
     "url": "URL：{{url}}",
     "envVars": "环境变量：{{count}} 个",
-    "streamableHttp": "可流式传输 HTTP"
+    "streamableHttp": "可流式传输 HTTP",
+    "errorStatus": "错误状态",
+    "error": "错误",
+    "noError": "无错误"
   },
   "detail": {
     "backToServers": "返回 MCP 服务器",
@@ -145,6 +148,9 @@
     "uuid": "UUID",
     "type": "类型",
     "created": "创建时间",
+    "errorStatus": "错误状态",
+    "error": "错误",
+    "noError": "无错误",
     "configuration": "配置",
     "command": "命令",
     "arguments": "参数",
@@ -200,4 +206,4 @@
     "failedToFetchTools": "从 MCP 服务器获取工具失败",
     "failedToSaveTools": "保存工具失败"
   }
-} 
+}

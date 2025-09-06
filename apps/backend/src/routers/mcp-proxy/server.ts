@@ -9,13 +9,15 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { McpServerTypeEnum } from "@repo/zod-types";
+import { McpServerErrorStatusEnum, McpServerTypeEnum } from "@repo/zod-types";
 import express from "express";
 import { parse as shellParseArgs } from "shell-quote";
 import { findActualExecutable } from "spawn-rx";
 
+import { mcpServersRepository } from "../../db/repositories";
 import mcpProxy from "../../lib/mcp-proxy";
 import { transformDockerUrl } from "../../lib/metamcp/client";
+import { mcpServerPool } from "../../lib/metamcp/mcp-server-pool";
 import { resolveEnvVariables } from "../../lib/metamcp/utils";
 import { ProcessManagedStdioTransport } from "../../lib/stdio-transport/process-managed-transport";
 import { betterAuthMcpMiddleware } from "../../middleware/better-auth-mcp.middleware";
@@ -69,6 +71,80 @@ const setStdioCooldown = (
 ) => {
   const key = createStdioKey(command, args, env);
   stdioCommandCooldowns.set(key, Date.now() + STDIO_COOLDOWN_DURATION);
+};
+
+// Function to extract server UUID from STDIO command
+const extractServerUuidFromStdioCommand = async (
+  command: string,
+  args: string[],
+): Promise<string | null> => {
+  try {
+    // For filesys server, the command is typically: npx @modelcontextprotocol/server-filesystem /workspaceFolder
+    // We need to find the server in the database that matches this command pattern
+
+    // First, try to find by command and args pattern
+    const fullCommand = `${command} ${args.join(" ")}`;
+    console.log(`Looking for server with command: ${fullCommand}`);
+
+    // Look for servers that match this command pattern
+    const servers = await mcpServersRepository.findAll();
+    console.log(`Found ${servers.length} servers in database`);
+
+    for (const server of servers) {
+      if (server.type === "STDIO" && server.command) {
+        const serverCommand = `${server.command} ${(server.args || []).join(" ")}`;
+        console.log(
+          `Checking server ${server.name} (${server.uuid}): ${serverCommand}`,
+        );
+        if (serverCommand === fullCommand) {
+          console.log(
+            `Found exact match for server ${server.name} (${server.uuid})`,
+          );
+          return server.uuid;
+        }
+      }
+    }
+
+    // If no exact match, try to find by command only (for cases where args might vary)
+    for (const server of servers) {
+      if (server.type === "STDIO" && server.command === command) {
+        console.log(
+          `Found command-only match for server ${server.name} (${server.uuid})`,
+        );
+        return server.uuid;
+      }
+    }
+
+    console.log(`No server found for command: ${fullCommand}`);
+    return null;
+  } catch (error) {
+    console.error("Error extracting server UUID from STDIO command:", error);
+    return null;
+  }
+};
+
+// Function to check if server is in error state
+const checkServerErrorStatus = async (serverUuid: string): Promise<boolean> => {
+  try {
+    const server = await mcpServersRepository.findByUuid(serverUuid);
+    if (!server) {
+      console.log(`Server ${serverUuid} not found`);
+      return false;
+    }
+
+    const isInError =
+      server.error_status === McpServerErrorStatusEnum.Enum.ERROR;
+    if (isInError) {
+      console.log(`Server ${server.name} (${serverUuid}) is in ERROR state`);
+    }
+    return isInError;
+  } catch (error) {
+    console.error(
+      `Error checking server error status for ${serverUuid}:`,
+      error,
+    );
+    return false;
+  }
 };
 
 // Function to get HTTP headers.
@@ -183,6 +259,17 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
       }
     }
 
+    // Check if the server is in error state
+    const serverUuid = await extractServerUuidFromStdioCommand(cmd, args);
+    if (serverUuid) {
+      const isInError = await checkServerErrorStatus(serverUuid);
+      if (isInError) {
+        throw new Error(
+          `Server is in error state and cannot be connected to. Please check the server configuration and try again later.`,
+        );
+      }
+    }
+
     console.log(`STDIO transport: command=${cmd}, args=${args}`);
 
     const transport = new ProcessManagedStdioTransport({
@@ -206,6 +293,20 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
   } else if (transportType === McpServerTypeEnum.Enum.SSE) {
     const url = transformDockerUrl(query.url as string);
 
+    // Check if the server is in error state (for SSE, we need to find server by URL)
+    const servers = await mcpServersRepository.findAll();
+    const matchingServer = servers.find(
+      (server) => server.type === "SSE" && server.url === url,
+    );
+    if (matchingServer) {
+      const isInError = await checkServerErrorStatus(matchingServer.uuid);
+      if (isInError) {
+        throw new Error(
+          `Server is in error state and cannot be connected to. Please check the server configuration and try again later.`,
+        );
+      }
+    }
+
     const headers = getHttpHeaders(req, transportType);
 
     console.log(
@@ -223,16 +324,29 @@ const createTransport = async (req: express.Request): Promise<Transport> => {
     await transport.start();
     return transport;
   } else if (transportType === McpServerTypeEnum.Enum.STREAMABLE_HTTP) {
+    const url = transformDockerUrl(query.url as string);
+
+    // Check if the server is in error state (for STREAMABLE_HTTP, we need to find server by URL)
+    const servers = await mcpServersRepository.findAll();
+    const matchingServer = servers.find(
+      (server) => server.type === "STREAMABLE_HTTP" && server.url === url,
+    );
+    if (matchingServer) {
+      const isInError = await checkServerErrorStatus(matchingServer.uuid);
+      if (isInError) {
+        throw new Error(
+          `Server is in error state and cannot be connected to. Please check the server configuration and try again later.`,
+        );
+      }
+    }
+
     const headers = getHttpHeaders(req, transportType);
 
-    const transport = new StreamableHTTPClientTransport(
-      new URL(transformDockerUrl(query.url as string)),
-      {
-        requestInit: {
-          headers,
-        },
+    const transport = new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: {
+        headers,
       },
-    );
+    });
     await transport.start();
     return transport;
   } else {
@@ -282,6 +396,41 @@ serverRouter.post("/mcp", async (req, res) => {
       }
 
       console.log("Created StreamableHttp server transport");
+
+      // Set up crash detection for STDIO transports in StreamableHttp route
+      if (serverTransport instanceof ProcessManagedStdioTransport) {
+        serverTransport.onprocesscrash = async (exitCode, signal) => {
+          console.warn(
+            `StreamableHttp STDIO process crashed with code: ${exitCode}, signal: ${signal}`,
+          );
+
+          // Try to extract server UUID from the command/args
+          const query = req.query;
+          const command = query.command as string;
+          const origArgs = shellParseArgs(query.args as string) as string[];
+
+          const serverUuid = await extractServerUuidFromStdioCommand(
+            command,
+            origArgs,
+          );
+
+          if (serverUuid) {
+            // Report crash to server pool
+            mcpServerPool
+              .handleServerCrashWithoutNamespace(serverUuid, exitCode, signal)
+              .catch((error) => {
+                console.error(
+                  `Error reporting StreamableHttp STDIO crash to server pool for ${serverUuid}:`,
+                  error,
+                );
+              });
+          } else {
+            console.warn(
+              `Could not determine server UUID for crashed StreamableHttp STDIO process: ${command} ${origArgs.join(" ")}`,
+            );
+          }
+        };
+      }
 
       // Generate session ID upfront for better tracking
       const newSessionId = randomUUID();
@@ -435,6 +584,48 @@ serverRouter.get("/stdio", async (req, res) => {
     await webAppTransport.start();
 
     const stdinTransport = serverTransport as ProcessManagedStdioTransport;
+
+    // Set up crash detection for the server pool
+    stdinTransport.onprocesscrash = async (exitCode, signal) => {
+      console.warn(
+        `STDIO process crashed with code: ${exitCode}, signal: ${signal}`,
+      );
+
+      // Try to extract server UUID from the command/args
+      const query = req.query;
+      const command = query.command as string;
+      const origArgs = shellParseArgs(query.args as string) as string[];
+
+      console.log(
+        `STDIO crash handler called for command: ${command} ${origArgs.join(" ")}`,
+      );
+
+      // For filesys server, the server UUID might be in the args or we need to derive it
+      // For now, we'll use a fallback approach to find the server UUID
+      const serverUuid = await extractServerUuidFromStdioCommand(
+        command,
+        origArgs,
+      );
+
+      if (serverUuid) {
+        console.log(
+          `Reporting crash to server pool for server UUID: ${serverUuid}`,
+        );
+        // Report crash to server pool
+        mcpServerPool
+          .handleServerCrashWithoutNamespace(serverUuid, exitCode, signal)
+          .catch((error) => {
+            console.error(
+              `Error reporting STDIO crash to server pool for ${serverUuid}:`,
+              error,
+            );
+          });
+      } else {
+        console.warn(
+          `Could not determine server UUID for crashed STDIO process: ${command} ${origArgs.join(" ")}`,
+        );
+      }
+    };
 
     // Monitor for quick failures and set cooldown
     const commandStartTime = Date.now();
