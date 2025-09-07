@@ -18,6 +18,21 @@ export const configService = {
     );
   },
 
+  async isSsoSignupDisabled(): Promise<boolean> {
+    const config = await configRepo.getConfig(
+      ConfigKeyEnum.Enum.DISABLE_SSO_SIGNUP,
+    );
+    return config?.value === "true";
+  },
+
+  async setSsoSignupDisabled(disabled: boolean): Promise<void> {
+    await configRepo.setConfig(
+      ConfigKeyEnum.Enum.DISABLE_SSO_SIGNUP,
+      disabled.toString(),
+      "Whether new user signup via SSO/OAuth is disabled",
+    );
+  },
+
   async getMcpResetTimeoutOnProgress(): Promise<boolean> {
     const config = await configRepo.getConfig(
       ConfigKeyEnum.Enum.MCP_RESET_TIMEOUT_ON_PROGRESS,
@@ -58,6 +73,21 @@ export const configService = {
       ConfigKeyEnum.Enum.MCP_MAX_TOTAL_TIMEOUT,
       timeout.toString(),
       "MCP maximum total timeout in milliseconds",
+    );
+  },
+
+  async getMcpMaxAttempts(): Promise<number> {
+    const config = await configRepo.getConfig(
+      ConfigKeyEnum.Enum.MCP_MAX_ATTEMPTS,
+    );
+    return config?.value ? parseInt(config.value, 10) : 1;
+  },
+
+  async setMcpMaxAttempts(maxAttempts: number): Promise<void> {
+    await configRepo.setConfig(
+      ConfigKeyEnum.Enum.MCP_MAX_ATTEMPTS,
+      maxAttempts.toString(),
+      "Maximum number of crash attempts before marking MCP server as ERROR",
     );
   },
 

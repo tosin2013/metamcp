@@ -14,6 +14,17 @@ export const configImplementations = {
     return { success: true };
   },
 
+  getSsoSignupDisabled: async (): Promise<boolean> => {
+    return await configService.isSsoSignupDisabled();
+  },
+
+  setSsoSignupDisabled: async (input: {
+    disabled: boolean;
+  }): Promise<{ success: boolean }> => {
+    await configService.setSsoSignupDisabled(input.disabled);
+    return { success: true };
+  },
+
   getMcpResetTimeoutOnProgress: async (): Promise<boolean> => {
     return await configService.getMcpResetTimeoutOnProgress();
   },
@@ -44,6 +55,17 @@ export const configImplementations = {
     timeout: number;
   }): Promise<{ success: boolean }> => {
     await configService.setMcpMaxTotalTimeout(input.timeout);
+    return { success: true };
+  },
+
+  getMcpMaxAttempts: async (): Promise<number> => {
+    return await configService.getMcpMaxAttempts();
+  },
+
+  setMcpMaxAttempts: async (input: {
+    maxAttempts: number;
+  }): Promise<{ success: boolean }> => {
+    await configService.setMcpMaxAttempts(input.maxAttempts);
     return { success: true };
   },
 

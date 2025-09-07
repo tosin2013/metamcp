@@ -3,6 +3,8 @@ import { z } from "zod";
 export const McpServerTypeEnum = z.enum(["STDIO", "SSE", "STREAMABLE_HTTP"]);
 export const McpServerStatusEnum = z.enum(["ACTIVE", "INACTIVE"]);
 
+export const McpServerErrorStatusEnum = z.enum(["NONE", "ERROR"]);
+
 // Define the form schema (includes UI-specific fields)
 export const createServerFormSchema = z
   .object({
@@ -184,6 +186,7 @@ export const McpServerSchema = z.object({
   created_at: z.string(),
   bearerToken: z.string().nullable(),
   user_id: z.string().nullable(),
+  error_status: McpServerErrorStatusEnum.optional(),
 });
 
 export const CreateMcpServerResponseSchema = z.object({
@@ -431,6 +434,7 @@ export const DatabaseMcpServerSchema = z.object({
   args: z.array(z.string()),
   env: z.record(z.string()),
   url: z.string().nullable(),
+  error_status: McpServerErrorStatusEnum,
   created_at: z.date(),
   bearerToken: z.string().nullable(),
   user_id: z.string().nullable(),

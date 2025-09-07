@@ -4,7 +4,7 @@ import { McpServerTypeEnum } from "@repo/zod-types";
 import { ArrowLeft, Calendar, Edit, Hash, Plug, Server } from "lucide-react";
 import Link from "next/link";
 import { notFound, useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EditNamespace } from "@/components/edit-namespace";
@@ -41,6 +41,7 @@ export default function NamespaceDetailPage({
 
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
+  const lastToggleTimeRef = useRef<number>(0);
 
   // Get tRPC utils for cache invalidation
   const utils = trpc.useUtils();
@@ -129,12 +130,51 @@ export default function NamespaceDetailPage({
     setEditDialogOpen(false);
     // The EditNamespace component already handles cache invalidation
     // So we just need to close the dialog
+
+    // Refresh the MetaMCP connection to pick up server changes
+    handleConnectionRefresh();
   };
 
   // Handle manual connect/disconnect
   const handleConnectionToggle = () => {
     if (connection.connectionStatus === "connected") {
       connection.disconnect();
+    } else {
+      connection.connect();
+    }
+  };
+
+  // Handle server status change - backend handles server pool invalidation automatically
+  const handleServerStatusChange = () => {
+    const now = Date.now();
+    const timeSinceLastToggle = now - lastToggleTimeRef.current;
+
+    // Prevent rapid successive toggles (minimum 2 seconds between toggles)
+    if (timeSinceLastToggle < 2000) {
+      toast.warning(t("namespaces:detail.toggleTooFast"), {
+        description: t("namespaces:detail.toggleTooFastDescription"),
+      });
+      return;
+    }
+
+    lastToggleTimeRef.current = now;
+
+    // No need to refresh connection - backend handles server pool invalidation
+    // This prevents unnecessary reinitialization of all MCP servers
+    console.log(
+      "Server status changed - backend will handle server pool invalidation",
+    );
+  };
+
+  // Handle connection refresh (disconnect and reconnect to pick up server changes)
+  const handleConnectionRefresh = () => {
+    if (connection.connectionStatus === "connected") {
+      connection.disconnect().then(() => {
+        // Small delay to ensure clean disconnect before reconnecting
+        setTimeout(() => {
+          connection.connect();
+        }, 100);
+      });
     } else {
       connection.connect();
     }
@@ -520,6 +560,7 @@ export default function NamespaceDetailPage({
           <NamespaceServersTable
             servers={namespace.servers}
             namespaceUuid={namespace.uuid}
+            onServerStatusChange={handleServerStatusChange}
           />
         </div>
 

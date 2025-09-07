@@ -8,6 +8,16 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,10 +56,15 @@ export default function ApiKeysPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [apiKeyToDelete, setApiKeyToDelete] = useState<{
+    uuid: string;
+    name: string;
+  } | null>(null);
   const { t } = useTranslations();
 
-  const { data: apiKeys, refetch } = trpc.apiKeys.list.useQuery();
-  const createMutation = trpc.apiKeys.create.useMutation({
+  const { data: apiKeys, refetch } = trpc.frontend.apiKeys.list.useQuery();
+  const createMutation = trpc.frontend.apiKeys.create.useMutation({
     onSuccess: (data) => {
       setNewApiKey(data.key);
       refetch();
@@ -60,11 +75,13 @@ export default function ApiKeysPage() {
     },
   });
 
-  const deleteMutation = trpc.apiKeys.delete.useMutation({
+  const deleteMutation = trpc.frontend.apiKeys.delete.useMutation({
     onSuccess: (data) => {
       if (data.success) {
         refetch();
         toast.success(t("api-keys:apiKeyDeleted"));
+        setDeleteDialogOpen(false);
+        setApiKeyToDelete(null);
       } else {
         // Handle backend error response
         toast.error(data.message || t("api-keys:apiKeyDeleted"));
@@ -111,6 +128,22 @@ export default function ApiKeysPage() {
 
   const maskKey = (key: string) => {
     return "•".repeat(key.length);
+  };
+
+  const handleDeleteClick = (apiKey: { uuid: string; name: string }) => {
+    setApiKeyToDelete(apiKey);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (apiKeyToDelete) {
+      deleteMutation.mutate({ uuid: apiKeyToDelete.uuid });
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setApiKeyToDelete(null);
   };
 
   return (
@@ -344,9 +377,7 @@ export default function ApiKeysPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
-                        deleteMutation.mutate({ uuid: apiKey.uuid })
-                      }
+                      onClick={() => handleDeleteClick({ uuid: apiKey.uuid, name: apiKey.name })}
                       disabled={deleteMutation.isPending}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -358,6 +389,30 @@ export default function ApiKeysPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("api-keys:confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("api-keys:deleteConfirmation")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel}>
+              {t("api-keys:cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? t("common:deleting") : t("api-keys:delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

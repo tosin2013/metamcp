@@ -278,12 +278,12 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="container relative h-screen flex items-center justify-center">
+    <div className="relative min-h-screen flex items-center justify-center px-4">
       <div className="absolute top-4 right-4 flex items-center gap-2">
         <ThemeToggle />
         <LanguageSwitcher />
       </div>
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+      <div className="w-full max-w-sm mx-auto flex flex-col justify-center space-y-6">
         <DomainWarningBanner />
         <Suspense fallback={<LoadingFallback />}>
           <RegisterForm />

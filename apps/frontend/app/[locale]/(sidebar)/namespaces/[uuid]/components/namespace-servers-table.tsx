@@ -1,6 +1,10 @@
 "use client";
 
-import { McpServerTypeEnum, NamespaceServer } from "@repo/zod-types";
+import {
+  McpServerErrorStatusEnum,
+  McpServerTypeEnum,
+  NamespaceServer,
+} from "@repo/zod-types";
 import {
   ColumnDef,
   flexRender,
@@ -22,7 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -49,11 +53,15 @@ import { trpc } from "@/lib/trpc";
 interface NamespaceServersTableProps {
   servers: NamespaceServer[];
   namespaceUuid: string;
+  onServerStatusChange?: () => void; // Callback for when server status changes
+  sessionInitializing?: boolean; // Whether session initialization is in progress
 }
 
 export function NamespaceServersTable({
   servers,
   namespaceUuid,
+  onServerStatusChange,
+  sessionInitializing = false,
 }: NamespaceServersTableProps) {
   const router = useRouter();
   const { t } = useTranslations();
@@ -64,6 +72,7 @@ export function NamespaceServersTable({
     },
   ]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const lastToggleTimeRef = useRef<number>(0);
 
   // TRPC utils for invalidating queries
   const utils = trpc.useUtils();
@@ -102,6 +111,11 @@ export function NamespaceServersTable({
             };
           },
         );
+        
+        // Trigger connection refresh callback
+        if (onServerStatusChange) {
+          onServerStatusChange();
+        }
       },
       onError: (error) => {
         toast.error(t("namespaces:serversTable.failedToUpdateServerStatus"), {
@@ -113,6 +127,24 @@ export function NamespaceServersTable({
     });
 
   const handleStatusToggle = (serverUuid: string, currentStatus: string) => {
+    // Don't allow toggles during session initialization
+    if (sessionInitializing || updateServerStatusMutation.isPending) {
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastToggle = now - lastToggleTimeRef.current;
+    
+    // Prevent rapid successive toggles (minimum 1 second between toggles)
+    if (timeSinceLastToggle < 1000) {
+      toast.warning(t("namespaces:serversTable.toggleTooFast"), {
+        description: t("namespaces:serversTable.toggleTooFastDescription"),
+      });
+      return;
+    }
+    
+    lastToggleTimeRef.current = now;
+
     const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
 
     // Optimistic update: immediately update the UI
@@ -209,7 +241,7 @@ export function NamespaceServersTable({
       cell: ({ row }) => {
         const server = row.original;
         const isActive = server.status === "ACTIVE";
-        const isUpdating = updateServerStatusMutation.isPending;
+        const isDisabled = sessionInitializing || updateServerStatusMutation.isPending;
 
         return (
           <div className="px-3 py-2">
@@ -219,12 +251,39 @@ export function NamespaceServersTable({
                 onCheckedChange={() =>
                   handleStatusToggle(server.uuid, server.status)
                 }
-                disabled={isUpdating}
+                disabled={isDisabled}
                 aria-label={t("namespaces:serversTable.toggleStatus", {
                   name: server.name,
                 })}
               />
             </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "error_status",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            {t("namespaces:serversTable.errorStatus")}
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const errorStatus = row.getValue("error_status") as string;
+        const hasError = errorStatus === McpServerErrorStatusEnum.Enum.ERROR;
+        return (
+          <div className="px-3 py-2">
+            <Badge variant={hasError ? "destructive" : "success"}>
+              {hasError
+                ? t("namespaces:serversTable.error")
+                : t("namespaces:serversTable.noError")}
+            </Badge>
           </div>
         );
       },

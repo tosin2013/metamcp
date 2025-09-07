@@ -97,10 +97,12 @@ export class ProcessManagedStdioTransport implements Transport {
   private _readBuffer: ReadBuffer = new ReadBuffer();
   private _serverParams: StdioServerParameters;
   private _stderrStream: PassThrough | null = null;
+  private _isCleanup: boolean = false;
 
   onclose?: () => void;
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
+  onprocesscrash?: (exitCode: number | null, signal: string | null) => void;
 
   constructor(server: StdioServerParameters) {
     this._serverParams = server;
@@ -156,7 +158,16 @@ export class ProcessManagedStdioTransport implements Transport {
         resolve();
       });
 
-      this._process.on("close", (_code) => {
+      this._process.on("close", (code, signal) => {
+        // Only emit crash event if this wasn't a clean shutdown
+        if (!this._isCleanup && (code !== 0 || signal)) {
+          console.warn(`Process crashed with code: ${code}, signal: ${signal}`);
+          console.log(
+            `Calling onprocesscrash handler: ${this.onprocesscrash ? "handler exists" : "no handler"}`,
+          );
+          this.onprocesscrash?.(code, signal);
+        }
+
         this._process = undefined;
         this.onclose?.();
       });
@@ -220,6 +231,7 @@ export class ProcessManagedStdioTransport implements Transport {
   }
 
   async close(): Promise<void> {
+    this._isCleanup = true;
     this._abortController.abort();
 
     // Kill the entire process group to ensure full cleanup

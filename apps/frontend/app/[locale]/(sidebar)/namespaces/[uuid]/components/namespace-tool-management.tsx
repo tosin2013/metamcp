@@ -29,12 +29,14 @@ interface NamespaceToolManagementProps {
     schema: T,
     options?: { suppressToast?: boolean },
   ) => Promise<z.output<T>>; // Optional makeRequest function for MetaMCP connections
+  sessionInitializing?: boolean; // Whether session initialization is in progress
 }
 
 export function NamespaceToolManagement({
   servers,
   namespaceUuid,
   makeRequest,
+  sessionInitializing = false,
 }: NamespaceToolManagementProps) {
   const [loading, setLoading] = useState(false);
   const [mcpTools, setMcpTools] = useState<
@@ -303,7 +305,9 @@ export function NamespaceToolManagement({
               disabled={true}
             >
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              {t("namespaces:toolManagement.refreshTools")}
+              {sessionInitializing
+                ? t("namespaces:toolManagement.initializing")
+                : t("namespaces:toolManagement.refreshTools")}
             </Button>
           </div>
         </div>
@@ -357,17 +361,19 @@ export function NamespaceToolManagement({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshAllTools}
-            disabled={loading || isToolsLoading}
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${loading || isToolsLoading ? "animate-spin" : ""}`}
-            />
-            {t("namespaces:toolManagement.refreshTools")}
-          </Button>
+                      <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshAllTools}
+              disabled={loading || isToolsLoading || sessionInitializing}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${loading || isToolsLoading || sessionInitializing ? "animate-spin" : ""}`}
+              />
+              {sessionInitializing
+                ? t("namespaces:toolManagement.initializing")
+                : t("namespaces:toolManagement.refreshTools")}
+            </Button>
         </div>
       </div>
 
@@ -382,6 +388,7 @@ export function NamespaceToolManagement({
             onRefreshTools={handleRefreshAllTools}
             namespaceUuid={namespaceUuid}
             servers={servers}
+            sessionInitializing={sessionInitializing}
           />
         </div>
       ) : (

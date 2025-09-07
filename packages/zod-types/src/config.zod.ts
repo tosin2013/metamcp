@@ -3,9 +3,11 @@ import { z } from "zod";
 // Define config key enum
 export const ConfigKeyEnum = z.enum([
   "DISABLE_SIGNUP",
+  "DISABLE_SSO_SIGNUP",
   "MCP_RESET_TIMEOUT_ON_PROGRESS",
   "MCP_TIMEOUT",
   "MCP_MAX_TOTAL_TIMEOUT",
+  "MCP_MAX_ATTEMPTS",
 ]);
 
 // Config schema
@@ -77,6 +79,7 @@ export type ConfigUpdateInput = z.infer<typeof ConfigUpdateInputSchema>;
 export const SettingsFormSchema = z.object({
   mcpTimeout: z.number().int(),
   mcpMaxTotalTimeout: z.number().int(),
+  mcpMaxAttempts: z.number().int(),
 });
 
 export type SettingsFormData = z.infer<typeof SettingsFormSchema>;

@@ -203,7 +203,15 @@ export class ApiKeysRepository {
         ...(input.name && { name: input.name }),
         ...(input.is_active !== undefined && { is_active: input.is_active }),
       })
-      .where(and(eq(apiKeysTable.uuid, uuid), eq(apiKeysTable.user_id, userId)))
+      .where(
+        and(
+          eq(apiKeysTable.uuid, uuid),
+          or(
+            eq(apiKeysTable.user_id, userId),
+            isNull(apiKeysTable.user_id)
+          )
+        )
+      )
       .returning({
         uuid: apiKeysTable.uuid,
         name: apiKeysTable.name,
@@ -222,7 +230,15 @@ export class ApiKeysRepository {
   async delete(uuid: string, userId: string) {
     const [deletedApiKey] = await db
       .delete(apiKeysTable)
-      .where(and(eq(apiKeysTable.uuid, uuid), eq(apiKeysTable.user_id, userId)))
+      .where(
+        and(
+          eq(apiKeysTable.uuid, uuid),
+          or(
+            eq(apiKeysTable.user_id, userId),
+            isNull(apiKeysTable.user_id)
+          )
+        )
+      )
       .returning({
         uuid: apiKeysTable.uuid,
         name: apiKeysTable.name,
